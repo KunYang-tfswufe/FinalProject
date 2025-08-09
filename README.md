@@ -27,7 +27,7 @@
 适用专业：计算机科学与技术（1-7）、智能科学与技术（1-8）、物联网工程（1-8）、信息管理与信息系统（1-5）
 知网地址:https://co2.cnki.net/Login.html?dp=tfswufe&r=1685087871577
 账户为学号例如:42212346
-初始密码为:lmky3
+密码例如:let*********3(星号为加密部分)
 ```
 我的毕业设计题目是:基于边缘计算的藏红花全生长周期智能培育系统设计与实现
 我采用的软硬件是:树莓派4B,采用Python Flask web服务到安卓的PWA (Progressive Web App)形成移动app端,STM32L476RGT6U(原型设计为NUCLEO-L476RG,Arm Cortex-M4 CPU 内核) 

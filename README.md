@@ -30,6 +30,6 @@
 初始密码为:lmky3
 ```
 我的毕业设计题目是:基于边缘计算的藏红花全生长周期智能培育系统设计与实现
-我采用的软硬件是:树莓派4B,采用Python Flask web服务到安卓app浏览器形成移动端,STM32L476RGT6U(原型设计为NUCLEO-L476RG,Arm Cortex-M4 CPU 内核) 
+我采用的软硬件是:树莓派4B,采用Python Flask web服务到安卓的PWA (Progressive Web App)形成移动app端,STM32L476RGT6U(原型设计为NUCLEO-L476RG,Arm Cortex-M4 CPU 内核) 
 
 

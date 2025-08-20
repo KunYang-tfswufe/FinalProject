@@ -43,7 +43,9 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+uint8_t rx_buffer[32]; // 接收缓冲区
+uint8_t rx_data;       // 临时存放一个字节的数据
+uint8_t rx_index = 0;    // 接收缓冲区索引
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -90,17 +92,29 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_UART_Receive_IT(&huart2, &rx_data, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    // 翻转LD2(PA5)引脚的电平
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    // 延时500毫秒
-    HAL_Delay(500);
+    // 模拟温湿度数据
+    float temp = 25.5;
+    float hum = 60.2;
+
+    // 创建一个缓冲区来格式化字符串
+    char tx_buffer[64];
+
+    // 使用 sprintf 格式化字符串，注意末尾的 \n 是必须的！
+    sprintf(tx_buffer, "%.1f,%.1f\n", temp, hum);
+
+    // 通过 UART2 发送数据
+    HAL_UART_Transmit(&huart2, (uint8_t*)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+
+    // 延时2秒
+    HAL_Delay(2000);
+
     /* USER CODE END WHILE */
     /* USER CODE BEGIN 3 */
   }
@@ -231,7 +245,36 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    // 确保是USART2触发的中断
+    if(huart->Instance == USART2)
+    {
+        // 将收到的字节存入缓冲区
+        rx_buffer[rx_index++] = rx_data;
 
+        // 如果收到了换行符 '\n'，或者缓冲区满了
+        if(rx_data == '\n' || rx_index >= sizeof(rx_buffer))
+        {
+            // 简单的指令判断
+            if(strncmp((char*)rx_buffer, "LED_ON", 6) == 0)
+            {
+                HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET); // 开灯
+            }
+            else if(strncmp((char*)rx_buffer, "LED_OFF", 7) == 0)
+            {
+                HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET); // 关灯
+            }
+
+            // 清空接收缓冲区和索引
+            rx_index = 0;
+            memset(rx_buffer, 0, sizeof(rx_buffer));
+        }
+
+        // 再次启动中断接收，准备接收下一个字节
+        HAL_UART_Receive_IT(&huart2, &rx_data, 1);
+    }
+}
 /* USER CODE END 4 */
 
 /**

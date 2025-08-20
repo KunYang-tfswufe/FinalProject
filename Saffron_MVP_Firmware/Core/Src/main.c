@@ -107,8 +107,7 @@ int main(void)
     char tx_buffer[64];
 
     // 使用 sprintf 格式化字符串，注意末尾的 \n 是必须的！
-    sprintf(tx_buffer, "%.1f,%.1f\n", temp, hum);
-
+    sprintf(tx_buffer, "%.1f,%.1f\r\n", temp, hum);
     // 通过 UART2 发送数据
     HAL_UART_Transmit(&huart2, (uint8_t*)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
 

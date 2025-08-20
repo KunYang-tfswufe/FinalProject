@@ -97,8 +97,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    // 翻转LD2(PA5)引脚的电平
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    // 延时500毫秒
+    HAL_Delay(500);
     /* USER CODE END WHILE */
-
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */

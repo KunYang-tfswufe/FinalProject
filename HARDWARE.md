@@ -1,4 +1,4 @@
-以下是我已有的硬件(只不过大部分我都不会用):
+以下是我已有的硬件(只不过大部分我都不会用,如果有更简单的请推荐我买更简单的但是我资金有预算):
 树莓派4B
 NUCLEO-L476RG
 esp-12F model esp8266MOD CH340 Driver
@@ -13,3 +13,4 @@ MH-FMD Low level trigger
 Tracker Sensor
 Relay model TONGLING 5VDC 10A 250VAC 15A 125VAC 10A 220VAC JQC-3FF-S-Z 1路光耦隔离继电器驱动模块支持高/低电平触发
 sensor shield v5.0
+HW-389 NodeMcu Ver 1.0

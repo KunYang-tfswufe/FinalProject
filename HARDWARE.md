@@ -14,3 +14,7 @@ Tracker Sensor
 Relay model TONGLING 5VDC 10A 250VAC 15A 125VAC 10A 220VAC JQC-3FF-S-Z 1路光耦隔离继电器驱动模块支持高/低电平触发
 sensor shield v5.0
 HW-389 NodeMcu Ver 1.0
+LCD9648 普中科技 www.prechin.cn
+MH-Sensor-series
+MH_Electronic
+土壤湿度检测(REMOVE SEAL AFTER WASHING)

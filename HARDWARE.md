@@ -33,5 +33,7 @@ HW-103 v0.1
 9V电池两个
 Grayscale Sensor
 Tower Pro Micro Servo 9g SG90
-
+摇杆模块
+ULN2003 步进电机驱动板
+电位器
 土壤湿度检测(REMOVE SEAL AFTER WASHING)

@@ -25,10 +25,13 @@ Water Sensor
 MQ Sensor Flying Fish MQ-2
 RFID-RC522
 HC-SR04
+HW-103 v0.1
 5011AS
 5161BS
 马达x3(有不同的样子)和风扇
 还要个类似马达的东西:STEP MOTOR 28BYJ-48 5V DC 2405005728
 9V电池两个
+Grayscale Sensor
+Tower Pro Micro Servo 9g SG90
 
 土壤湿度检测(REMOVE SEAL AFTER WASHING)

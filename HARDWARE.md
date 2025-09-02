@@ -37,3 +37,10 @@ Tower Pro Micro Servo 9g SG90
 ULN2003 步进电机驱动板
 电位器
 土壤湿度检测(REMOVE SEAL AFTER WASHING)
+Hall Effect Sensor Module
+Passive Infrared Sensor
+WS2812B RGB LED
+声音传感器模块
+激光二极管模块
+蓝牙模块
+蜂鸣器

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>藏红花培育系统 - 实时监控</title>
     <style>
+        /* 页面基础样式 */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex;
@@ -15,28 +16,39 @@
             background-color: #f0f2f5;
             color: #333;
         }
+        /* 仪表盘容器样式 */
         .dashboard {
             background-color: white;
             padding: 40px;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px_12px rgba(0, 0, 0, 0.1);
             text-align: center;
+            min-width: 300px;
         }
+        /* 主标题样式 */
         h1 {
             margin-top: 0;
-            color: #1a73e8;
+            color: #1a73e8; /* 蓝色标题 */
+            font-size: 1.5em; /* 调整字体大小 */
         }
+        /* 数据卡片样式 */
         .data-card {
             margin-top: 20px;
             font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        /* 数据数值的span标签样式 */
         .data-card span {
             font-weight: bold;
-            color: #e67e22;
+            color: #e67e22; /* 橙色数据 */
             min-width: 80px;
             display: inline-block;
             text-align: left;
+            padding: 0 10px;
         }
+        /* 时间戳样式 */
         #timestamp {
             margin-top: 30px;
             font-size: 0.9em;
@@ -60,46 +72,50 @@
     </div>
 
     <script>
-        // --- 配置区 ---
-        // 将这里的 IP 地址替换成你的树莓派的 IP 地址
-        const RASPBERRY_PI_IP = '10.126.247.14'; 
-        // ----------------
+        // API的URL现在是一个相对路径。
+        // 浏览器会自动将其解析为 http://<当前域名>:<当前端口>/api/v1/sensors/latest
+        const apiUrl = '/api/v1/sensors/latest';
 
-        const apiUrl = `http://${RASPBERRY_PI_IP}:5000/api/v1/sensors/latest`;
-
+        // 获取页面上需要更新数据的DOM元素
         const tempElement = document.getElementById('temp');
         const humiElement = document.getElementById('humi');
         const timeElement = document.getElementById('update-time');
 
-        // 定义一个函数来获取并更新数据
+        // 定义一个异步函数来获取并更新数据
         async function fetchData() {
             try {
+                // 使用fetch API向后端请求数据
                 const response = await fetch(apiUrl);
                 
+                // 检查HTTP响应状态码是否表示成功
                 if (!response.ok) {
                     throw new Error(`HTTP 错误! 状态: ${response.status}`);
                 }
 
+                // 将响应体解析为JSON格式
                 const data = await response.json();
 
-                // 更新页面上的数据
-                // data.temperature ?? '--' 意思是如果 data.temperature 是 null 或 undefined，就显示 '--'
+                // 更新页面上的数据内容
+                // 使用空值合并操作符(??): 如果data.temperature是null或undefined，就显示'--'
                 tempElement.textContent = data.temperature ?? '--';
                 humiElement.textContent = data.humidity ?? '--';
                 timeElement.textContent = data.timestamp ?? 'N/A';
                 
             } catch (error) {
+                // 如果在try块中发生任何错误（网络错误、解析错误等），则执行catch块
                 console.error("获取数据失败:", error);
+                // 在页面上显示错误状态，提供用户反馈
                 tempElement.textContent = '❌';
                 humiElement.textContent = '❌';
                 timeElement.textContent = '连接失败';
             }
         }
 
-        // 页面加载后立即执行一次
+        // 首次加载页面时，立即调用一次fetchData函数，以便尽快显示数据
         fetchData();
 
-        // 设置一个定时器，每 2 秒钟调用一次 fetchData 函数
+        // 使用setInterval设置一个定时器，每隔2000毫秒（2秒）就自动调用一次fetchData函数
+        // 这就实现了数据的实时刷新
         setInterval(fetchData, 2000); 
     </script>
 

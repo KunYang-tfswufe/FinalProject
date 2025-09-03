@@ -1,0 +1,18 @@
+# ===================================================================
+# .gitignore for FinalProject (Monorepo)
+# ===================================================================
+
+# 忽略 STM32 项目的编译输出
+# 路径是相对于仓库根目录的
+Saffron_STM32_Core/Debug/
+Saffron_STM32_Core/Release/
+Saffron_STM32_Core/build/
+
+# 未来可以为其他子项目添加规则
+# 例如，Python 后端项目
+# Saffron_RaspberryPi_Backend/__pycache__/
+# Saffron_RaspberryPi_Backend/.venv/
+
+# 例如，Node.js 前端项目
+# Saffron_PWA_Frontend/node_modules/
+# Saffron_PWA_Frontend/dist/

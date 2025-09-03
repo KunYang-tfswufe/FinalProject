@@ -102,6 +102,7 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
+
     /* USER CODE BEGIN 3 */
 	  DHT11_Read_Data(&dht_data); // 调用函数读取数据
 	  HAL_Delay(2000); // 延时2秒，DHT11不能读取太快

@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "dht11.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -93,6 +93,7 @@ int main(void)
   // 启用DWT外设，用于微秒级延时
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+  DHT11_Data_TypeDef dht_data;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -102,6 +103,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  DHT11_Read_Data(&dht_data); // 调用函数读取数据
+	  HAL_Delay(2000); // 延时2秒，DHT11不能读取太快
   }
   /* USER CODE END 3 */
 }

@@ -45,7 +45,11 @@
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-
+#define RX_BUFFER_SIZE 64 // 定义接收缓冲区的最大长度
+uint8_t rx_buffer[RX_BUFFER_SIZE]; // 接收缓冲区
+uint8_t rx_data; // 用于存放 HAL_UART_Receive_IT 接收到的单个字节
+uint8_t rx_index = 0; // 接收缓冲区的索引
+uint8_t command_received = 0; // 命令接收完成标志
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,6 +101,7 @@ int main(void)
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
   DHT11_Data_TypeDef dht_data;
   char tx_buffer[100]; // 定义一个足够大的缓冲区来存放我们的JSON字符串
+  HAL_UART_Receive_IT(&huart2, &rx_data, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -105,7 +110,27 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+	  /* USER CODE BEGIN 3 */
+	  // 检查是否有新命令需要处理
+	  if (command_received)
+	  {
+	      // 解析命令
+	      // 为了节省资源，我们使用简单的字符串查找，而不是完整的JSON解析
+	      if (strstr((char*)rx_buffer, "\"actuator\":\"led\"") && strstr((char*)rx_buffer, "\"action\":\"on\""))
+	      {
+	          led_on();
+	      }
+	      else if (strstr((char*)rx_buffer, "\"actuator\":\"led\"") && strstr((char*)rx_buffer, "\"action\":\"off\""))
+	      {
+	          led_off();
+	      }
+
+	      // 处理完毕后，清除命令接收完成标志和缓冲区
+	      command_received = 0;
+	      memset(rx_buffer, 0, RX_BUFFER_SIZE);
+	  }
+
+	  // ---- 温湿度数据读取与发送逻辑 ----
 	  if (DHT11_Read_Data(&dht_data)) // 检查是否读取成功
 	  {
 	    // 1. 使用 sprintf 将数据格式化为 JSON 字符串
@@ -251,7 +276,45 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// LED 控制函数
+void led_on(void)
+{
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+}
 
+void led_off(void)
+{
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+}
+
+/**
+  * @brief  串口接收完成回调函数
+  * @param  huart: UART handle
+  * @retval None
+  */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    // 判断是否是来自USART2的中断
+    if (huart->Instance == USART2)
+    {
+        // 如果接收到的字符不是换行符，则存入缓冲区
+        if (rx_data != '\n' && rx_index < RX_BUFFER_SIZE)
+        {
+            rx_buffer[rx_index++] = rx_data;
+        }
+        else
+        {
+            // 接收到换行符，表示一条命令结束
+            rx_buffer[rx_index] = '\0'; // 添加字符串结束符
+            command_received = 1; // 设置命令接收完成标志
+            rx_index = 0; // 重置索引，为下一条命令做准备
+        }
+
+        // 重新启动串口接收中断，准备接收下一个字节
+        // 这是至关重要的一步！
+        HAL_UART_Receive_IT(&huart2, &rx_data, 1);
+    }
+}
 /* USER CODE END 4 */
 
 /**

@@ -7,6 +7,7 @@
 Saffron_STM32_Core/Debug/
 Saffron_STM32_Core/Release/
 Saffron_STM32_Core/build/
+project_snapshot.txt
 
 # 未来可以为其他子项目添加规则
 # 例如，Python 后端项目

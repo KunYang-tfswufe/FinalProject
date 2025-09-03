@@ -77,6 +77,7 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
     > - **边缘计算层 (树莓派):** Python, Flask, SQLAlchemy, Gunicorn, Paho-MQTT
     > - **云服务层:** 公共/自建 MQTT Broker (如 EMQX, Mosquitto)
     > - **应用表现层 (Web/PWA):** 原生 HTML/CSS/JavaScript（无框架），可选引入 ECharts（CDN）用于图表
+    > - **可选（边缘视觉 AI）:** OpenCV (Python) 或简单阈值/形态学算法（无训练），若做轻量推理可用 Numpy 实现
     > - **数据库:** MySQL / MariaDB
     > - **开发/部署环境:** Arch Linux (开发), Raspberry Pi OS (部署), Nginx（静态资源）
 5.  **高层架构图:**
@@ -94,7 +95,7 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
     > 答：详见下文 **“核心数据模型 (数据库设计)”** 章节。
 7.  **主要页面线框图:**
     > - **登录页:** 用户名、密码输入。
-    > - **数据仪表盘 (Dashboard):** 实时数据显示卡片、设备状态、ECharts实时曲线图、快捷控制开关。
+    > - **数据仪表盘 (Dashboard):** 实时数据显示卡片、设备状态、ECharts实时曲线图、快捷控制开关；（可选）自动灌溉策略开关与阈值设置，边缘视觉告警指示。
     > - **历史数据页:** 按日期/时间范围查询历史数据，并以图表和表格形式展示。
     > - **后台管理页 (Admin):** 用户管理、角色权限分配、设备管理。
 8.  **任务列表/看板:**
@@ -148,6 +149,25 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
     - `timestamp` (DATETIME): 操作时间
     - `result` (VARCHAR): 执行结果 ('success', 'failed')
 
+> 可选扩展表：若启用自动水泵策略与边缘视觉告警
+
+7.  **灌溉策略表 (irrigation_policies)**
+    - `id` (INT, PK, AI)
+    - `device_id` (INT, FK -> devices.id)
+    - `enabled` (BOOLEAN): 是否启用自动灌溉
+    - `soil_threshold_min` (FLOAT): 土壤湿度下限阈值 (%)
+    - `watering_seconds` (INT): 每次浇水时长（秒）
+    - `created_at` (DATETIME)
+    - `updated_at` (DATETIME)
+
+8.  **视觉告警表 (vision_alerts)**
+    - `id` (BIGINT, PK, AI)
+    - `device_id` (INT, FK -> devices.id)
+    - `timestamp` (DATETIME, INDEX)
+    - `alert_type` (VARCHAR): 如 'pest', 'mold', 'growth_anomaly'
+    - `confidence` (FLOAT): 告警置信度（0-1）
+    - `snapshot_path` (VARCHAR): 截图或短视频路径（可选）
+
 ---
 
 ## 🚀 敏捷开发冲刺计划 (Agile Development Sprint Plan) - 精细化任务分解
@@ -161,11 +181,14 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 - （1）编程语言与主体业务逻辑：已采用 C（STM32）与 Python（Flask）。端到端链路与控制闭环明确，主体业务逻辑覆盖数据采集、传输、展示与控制。
 - （2）分层架构与视图分离：四层架构（感知/边缘/云/表现）已定义；后端 API 与前端模板、静态资源分离。
 - （3）UI 适配显示：采用原生 HTML/CSS/JS，使用媒体查询与响应式布局适配移动/桌面端。
+ - （3）UI 适配显示：采用原生 HTML/CSS/JS，使用媒体查询与响应式布局适配移动/桌面端；可选在仪表盘增加自动灌溉策略开关与视觉告警提示组件。
 - （4）数据库与不少于 6 表、存储过程/触发器：设计了 `users/roles/user_roles/devices/sensor_data/control_logs` 六表；后续补充存储过程与触发器并在第三周任务落实。
 - （5）测试用例与稳定性：第四周计划系统测试与压力测试，覆盖正常/异常场景。
 - （6）MCU 智能应用与联网：STM32 采集 DHT11 数据，串口与边缘服务器通信；预留执行器控制（继电器/LED）。
+ - （6）MCU 智能应用与联网：STM32 采集 DHT11 数据，串口与边缘服务器通信；预留执行器控制（继电器/LED/水泵）。
 - （7）ARM 侧（边缘）联网与控制：树莓派运行 Flask 与 MQTT 客户端，实现数据上报与指令转发。
 - （8）物联网系统集成：感知、控制、网络与应用端一体化，使用合适的中间件（MQTT）。
+ - （8）物联网系统集成：感知、控制、网络与应用端一体化，使用合适的中间件（MQTT）；可选引入边缘视觉与自动灌溉策略形成闭环。
 - （9）三端互通：硬件端（STM32）、边缘/云端（Flask + MQTT）、应用端（Web/PWA）贯通。
 
 ### **第一周：核心链路贯通 (The "Tracer Bullet" Sprint)**
@@ -213,7 +236,7 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 
 ### **第二周：MVP 功能完善 (The MVP Feature Sprint)**
 
-**🎯 本周目标：** 在核心链路基础上，扩展所有传感器，实现反向控制，并引入数据库进行数据持久化。
+**🎯 本周目标：** 在核心链路基础上，扩展所有传感器，实现反向控制，并引入数据库进行数据持久化；可选打通“自动水泵策略”的最简闭环。
 
 - #### **任务 2.1: STM32 功能扩展与反向控制**
   - [x] **多传感器集成:** 编写光照强度、土壤湿度传感器的驱动代码，并将其数据加入到上报的 JSON 结构中。
@@ -221,6 +244,7 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
   - [ ] **控制函数编写:** 编写 `pump_on()` 和 `pump_off()` 函数来控制 GPIO 的高低电平。
   - [ ] **串口接收中断:** 配置 UART 接收中断，将收到的字符存入一个缓冲区。
   - [ ] **命令解析:** 在主循环中检查接收缓冲区，解析收到的 JSON 命令 (e.g., `{"actuator": "pump", "action": "on"}`)，并调用相应的控制函数。
+  - [ ] **自动灌溉（可选，最小可行）:** 在边缘端新增后台任务（线程/定时器），周期拉取最新土壤湿度与策略：若 `enabled=true` 且 `soil_moisture < soil_threshold_min`，自动发送 `pump_on` 指令并按 `watering_seconds` 后 `pump_off`；写入 `control_logs`。
   - [ ] **[验证] 串口调试助手:** 使用 PC 串口工具发送控制 JSON，观察 STM32 上的继电器/LED 是否动作。
 
 - #### **任务 2.2: 后端数据库集成**
@@ -229,6 +253,8 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
   - [ ] **模型定义:** 在 Flask 应用中，使用 SQLAlchemy 定义 `Device` 和 `SensorData` 模型，对应数据库表结构。
   - [ ] **数据库初始化:** 编写一个命令或首次运行时自动创建所有数据表。
   - [ ] **数据持久化:** 修改串口接收的后台线程，在解析数据后，创建一个 `SensorData` 对象并存入数据库会话 (`db.session.add()`, `db.session.commit()`)。
+  - [ ] （可选）**灌溉策略表:** 创建/维护 `irrigation_policies` 表的基础 CRUD（开/关、阈值、时长）。
+  - [ ] （可选）**视觉告警表:** 创建/维护 `vision_alerts` 表的写入与查询 API（若启用视觉）。
   - [ ] **[验证] 数据库查询:** 使用数据库客户端 (如 `mysql` 命令行) 查询 `sensor_data` 表，确认新数据被持续写入。
 
 - #### **任务 2.3: 后端控制 API 与日志**
@@ -250,7 +276,7 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 
 ### **第三周：云端通信与用户体验 (The Cloud & UX Sprint)**
 
-**🎯 本周目标：** 引入用户认证系统、集成 MQTT 实现远程通信、完善数据可视化和响应式布局，使系统成为一个完整的应用。
+**🎯 本周目标：** 引入用户认证系统、集成 MQTT 实现远程通信、完善数据可视化和响应式布局，使系统成为一个完整的应用；可选引入边缘视觉告警采集与上报。
 
 - #### **任务 3.1: 后端用户认证 (RBAC)**
   - [ ] **数据库建表:** 使用 SQLAlchemy 定义 `User`, `Role`, `UserRole` 模型并生成数据表。
@@ -273,11 +299,13 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
   - [ ] **数据上报:** 在主程序的后台线程中，除了存数据库外，还将每条传感器数据 publish 到一个 Topic (e.g., `saffron/device1/data`)。
   - [ ] **指令下发:** 让 MQTT 客户端 subscribe 一个控制 Topic (e.g., `saffron/device1/control/set`)。在 `on_message` 回调中，解析收到的云端指令，并写入串口。
   - [ ] **[验证] MQTTX 测试:** 使用 MQTT 客户端工具 (如 MQTTX) 订阅数据 Topic，确认能收到树莓派发来的数据；再向控制 Topic 发布指令，确认 STM32 有响应。
+  - [ ] **视觉告警上报（可选）:** 运行一个简易摄像头采集/图片处理脚本（OpenCV 或阈值法），对明显异常进行判别并通过 Topic（如 `saffron/device1/vision/alerts`）上报；同步写入 `vision_alerts`。
 
 - #### **任务 3.4: 原生前端完善与 PWA**
   - [ ] **登录/登出:** 创建 `templates/login.html`，实现登录/登出，使用 `localStorage` 存储 JWT。
   - [ ] **访问控制:** 采用多页面（`login.html` / `dashboard.html` / `history.html` / `admin.html`）；在页面脚本中检测 JWT，未登录跳转登录页。
   - [ ] **后台管理页:** 新增 `templates/admin.html`，原生表格展示用户列表与角色信息（管理员权限）。
+  - [ ] **策略与视觉（可选 UI）:** 在 `dashboard.html` 添加自动灌溉策略的开/关与阈值设置控件；添加视觉告警提示区域与最近告警列表。
   - [ ] **响应式设计:** 使用 CSS Flex/Grid + 媒体查询，适配移动端与桌面端。
   - [ ] **PWA 配置:** 增加 `manifest.json` 与 `service-worker.js`，缓存关键静态资源与接口降级策略。
   - [ ] **[验证] 多设备测试:** 在 PC/手机浏览器访问应用，检查登录、权限、离线缓存与安装体验。

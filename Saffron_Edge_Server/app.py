@@ -3,6 +3,7 @@ import json
 import threading
 import time
 from flask import Flask, jsonify
+from flask_cors import CORS  # <--- 1. 导入CORS
 
 # --- 全局变量 ---
 # 使用线程锁来确保线程安全
@@ -56,6 +57,7 @@ def serial_reader():
 
 # --- Flask Web 应用 ---
 app = Flask(__name__)
+CORS(app)  # <--- 2. 启用CORS，允许所有来源的跨域请求
 
 @app.route('/api/v1/sensors/latest', methods=['GET'])
 def get_latest_sensor_data():

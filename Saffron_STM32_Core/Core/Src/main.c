@@ -105,7 +105,6 @@ int main(void)
   {
     /* USER CODE END WHILE */
 
-
     /* USER CODE BEGIN 3 */
 	  if (DHT11_Read_Data(&dht_data)) // 检查是否读取成功
 	  {

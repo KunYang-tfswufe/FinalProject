@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>藏红花培育系统 - 实时监控</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .dashboard {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h1 {
+            margin-top: 0;
+            color: #1a73e8;
+        }
+        .data-card {
+            margin-top: 20px;
+            font-size: 2em;
+        }
+        .data-card span {
+            font-weight: bold;
+            color: #e67e22;
+            min-width: 80px;
+            display: inline-block;
+            text-align: left;
+        }
+        #timestamp {
+            margin-top: 30px;
+            font-size: 0.9em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard">
+        <h1>🌱 藏红花培育环境监控</h1>
+        <div class="data-card">
+            🌡️ 温度: <span id="temp">--</span> °C
+        </div>
+        <div class="data-card">
+            💧 湿度: <span id="humi">--</span> %
+        </div>
+        <div id="timestamp">
+            最后更新时间: <span id="update-time">从未</span>
+        </div>
+    </div>
+
+    <script>
+        // --- 配置区 ---
+        // 将这里的 IP 地址替换成你的树莓派的 IP 地址
+        const RASPBERRY_PI_IP = '10.126.247.14'; 
+        // ----------------
+
+        const apiUrl = `http://${RASPBERRY_PI_IP}:5000/api/v1/sensors/latest`;
+
+        const tempElement = document.getElementById('temp');
+        const humiElement = document.getElementById('humi');
+        const timeElement = document.getElementById('update-time');
+
+        // 定义一个函数来获取并更新数据
+        async function fetchData() {
+            try {
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP 错误! 状态: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // 更新页面上的数据
+                // data.temperature ?? '--' 意思是如果 data.temperature 是 null 或 undefined，就显示 '--'
+                tempElement.textContent = data.temperature ?? '--';
+                humiElement.textContent = data.humidity ?? '--';
+                timeElement.textContent = data.timestamp ?? 'N/A';
+                
+            } catch (error) {
+                console.error("获取数据失败:", error);
+                tempElement.textContent = '❌';
+                humiElement.textContent = '❌';
+                timeElement.textContent = '连接失败';
+            }
+        }
+
+        // 页面加载后立即执行一次
+        fetchData();
+
+        // 设置一个定时器，每 2 秒钟调用一次 fetchData 函数
+        setInterval(fetchData, 2000); 
+    </script>
+
+</body>
+</html>

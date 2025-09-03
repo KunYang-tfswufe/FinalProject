@@ -160,40 +160,40 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 
 - #### **任务 1.1: STM32 环境搭建与传感器读取**
   - [x] **环境搭建:** 在 Arch Linux 上安装 STM32CubeIDE。
-  - [ ] **项目创建:** 在 CubeIDE 中为 NUCLEO-L476RG 创建新项目。
-  - [ ] **CubeMX 配置 (时钟与调试):** 配置 RCC (使用 HSI/HSE) 和 SYS (启用 SWD 调试)。
-  - [ ] **CubeMX 配置 (UART):** 启用一个 USART 实例 (如 USART2)，配置引脚、波特率 (e.g., 115200)。
-  - [ ] **CubeMX 配置 (传感器):** 为 DHT22 温湿度传感器配置一个 GPIO 引脚为输入/输出模式。
-  - [ ] **代码生成:** 从 CubeMX 生成初始化代码。
-  - [ ] **驱动编写:** 编写或移植 DHT22 驱动代码，实现读取温湿度值的函数。
-  - [ ] **主循环逻辑:** 在 `main.c` 的 `while(1)` 循环中，定时调用传感器读取函数。
-  - [ ] **[验证] 调试器验证:** 使用调试器 (Debugger) 设置断点，查看变量值，确认能读到非零的温湿度数据。
+  - [x] **项目创建:** 在 CubeIDE 中为 NUCLEO-L476RG 创建新项目。
+  - [x] **CubeMX 配置 (时钟与调试):** 配置 RCC (使用 HSI/HSE) 和 SYS (启用 SWD 调试)。
+  - [x] **CubeMX 配置 (UART):** 启用一个 USART 实例 (如 USART2)，配置引脚、波特率 (e.g., 115200)。
+  - [x] **CubeMX 配置 (传感器):** 为 DHT22 温湿度传感器配置一个 GPIO 引脚为输入/输出模式。
+  - [x] **代码生成:** 从 CubeMX 生成初始化代码。
+  - [x] **驱动编写:** 编写或移植 DHT22 驱动代码，实现读取温湿度值的函数。
+  - [x] **主循环逻辑:** 在 `main.c` 的 `while(1)` 循环中，定时调用传感器读取函数。
+  - [x] **[验证] 调试器验证:** 使用调试器 (Debugger) 设置断点，查看变量值，确认能读到非零的温湿度数据。
 
 - #### **任务 1.2: STM32 数据格式化与串口发送**
-  - [ ] **JSON 格式化:** 在主循环中，使用 `sprintf` 将读取到的温湿度值格式化为 JSON 字符串 (e.g., `{"temp":25.5,"humi":60.1}\r\n`)。 **注意：** 必须包含换行符 `\r\n` 作为消息结束符。
-  - [ ] **UART 发送:** 调用 `HAL_UART_Transmit()` 函数将格式化后的字符串通过串口发送出去。
-  - [ ] **添加延迟:** 在循环中加入 `HAL_Delay()` 确保发送频率不会过高 (e.g., 每 2-5 秒一次)。
-  - [ ] **[验证] Arch Linux 串口监听:** 使用 `minicom -D /dev/ttyACM0 -b 115200` (或类似命令) 确认能持续收到正确的 JSON 数据流。
+  - [x] **JSON 格式化:** 在主循环中，使用 `sprintf` 将读取到的温湿度值格式化为 JSON 字符串 (e.g., `{"temp":25.5,"humi":60.1}\r\n`)。 **注意：** 必须包含换行符 `\r\n` 作为消息结束符。
+  - [x] **UART 发送:** 调用 `HAL_UART_Transmit()` 函数将格式化后的字符串通过串口发送出去。
+  - [x] **添加延迟:** 在循环中加入 `HAL_Delay()` 确保发送频率不会过高 (e.g., 每 2-5 秒一次)。
+  - [x] **[验证] Arch Linux 串口监听:** 使用 `minicom -D /dev/ttyACM0 -b 115200` (或类似命令) 确认能持续收到正确的 JSON 数据流。
 
 - #### **任务 1.3: 树莓派 Python 串口接收**
-  - [ ] **环境准备 (树莓派):** 安装 Python3, pip, 及 `pyserial` 库 (`pip install pyserial`)。
-  - [ ] **编写独立脚本 (`serial_test.py`):** 编写一个简单的 Python 脚本，使用 `pyserial` 循环读取串口一行数据 (`readline()`)，并打印到控制台。
-  - [ ] **[验证] 数据解析:** 运行脚本，确认能正确接收并解析来自 STM32 的 JSON 字符串，无乱码或丢包。
+  - [x] **环境准备 (树莓派):** 安装 Python3, pip, 及 `pyserial` 库 (`pip install pyserial`)。
+  - [x] **编写独立脚本 (`serial_test.py`):** 编写一个简单的 Python 脚本，使用 `pyserial` 循环读取串口一行数据 (`readline()`)，并打印到控制台。
+  - [x] **[验证] 数据解析:** 运行脚本，确认能正确接收并解析来自 STM32 的 JSON 字符串，无乱码或丢包。
 
 - #### **任务 1.4: 最小化 Flask API 服务**
-  - [ ] **环境准备 (树莓派):** 安装 `flask` (`pip install flask`)。
-  - [ ] **创建 Flask 应用 (`app.py`):** 搭建一个最基础的 "Hello World" Flask 应用。
-  - [ ] **数据暂存设计:** 设计一个简单的全局变量 (e.g., a dictionary `latest_data = {}`) 来存储最新的传感器读数。
-  - [ ] **集成串口读取:** 将 `serial_test.py` 的逻辑封装成一个函数，并使用 `threading` 在 Flask 应用启动时在后台线程中运行此函数，持续更新 `latest_data`。
-  - [ ] **创建 API 端点:** 编写 `GET /api/v1/sensors/latest` 路由，它返回 `latest_data` 的 JSON 格式。
-  - [ ] **[验证] API 测试:** 在另一台电脑上使用 `curl http://<树莓派IP>:5000/api/v1/sensors/latest` 或浏览器访问，确认能获取 JSON 数据。
+  - [x] **环境准备 (树莓派):** 安装 `flask` (`pip install flask`)。
+  - [x] **创建 Flask 应用 (`app.py`):** 搭建一个最基础的 "Hello World" Flask 应用。
+  - [x] **数据暂存设计:** 设计一个简单的全局变量 (e.g., a dictionary `latest_data = {}`) 来存储最新的传感器读数。
+  - [x] **集成串口读取:** 将 `serial_test.py` 的逻辑封装成一个函数，并使用 `threading` 在 Flask 应用启动时在后台线程中运行此函数，持续更新 `latest_data`。
+  - [x] **创建 API 端点:** 编写 `GET /api/v1/sensors/latest` 路由，它返回 `latest_data` 的 JSON 格式。
+  - [x] **[验证] API 测试:** 在另一台电脑上使用 `curl http://<树莓派IP>:5000/api/v1/sensors/latest` 或浏览器访问，确认能获取 JSON 数据。
 
 - #### **任务 1.5: 纯 JS 实时数据显示**
-  - [ ] **创建 `index.html`:** 编写一个包含基本 HTML 结构的静态文件，内含用于显示数据的 `<div>` 或 `<span>` 元素 (e.g., `<p>Temperature: <span id="temp">--</span></p>`)。
-  - [ ] **编写 JavaScript:** 在 `<script>` 标签内，使用 `setInterval` 和 `fetch` API，每隔几秒请求一次后端的 `/api/v1/sensors/latest` 接口。
-  - [ ] **数据绑定:** 在 `fetch` 的回调函数中，解析返回的 JSON，并使用 `document.getElementById().innerText` 将数据更新到 HTML 页面上。
-  - [ ] **本地服务:** 在树莓派上用 `python -m http.server 8000` 启动一个简单的 Web 服务器来提供 `index.html`。
-  - [ ] **[验证] 端到端流程:** 在浏览器中打开 `http://<树莓派IP>:8000`，确认能看到来自 STM32 的数据在页面上实时刷新。
+  - [x] **创建 `index.html`:** 编写一个包含基本 HTML 结构的静态文件，内含用于显示数据的 `<div>` 或 `<span>` 元素 (e.g., `<p>Temperature: <span id="temp">--</span></p>`)。
+  - [x] **编写 JavaScript:** 在 `<script>` 标签内，使用 `setInterval` 和 `fetch` API，每隔几秒请求一次后端的 `/api/v1/sensors/latest` 接口。
+  - [x] **数据绑定:** 在 `fetch` 的回调函数中，解析返回的 JSON，并使用 `document.getElementById().innerText` 将数据更新到 HTML 页面上。
+  - [x] **本地服务:** 在树莓派上用 `python -m http.server 8000` 启动一个简单的 Web 服务器来提供 `index.html`。
+  - [x] **[验证] 端到端流程:** 在浏览器中打开 `http://<树莓派IP>:8000`，确认能看到来自 STM32 的数据在页面上实时刷新。
 
 ---
 

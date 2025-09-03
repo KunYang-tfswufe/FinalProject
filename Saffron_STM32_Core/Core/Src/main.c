@@ -22,6 +22,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "dht11.h"
+#include <stdio.h>   // <-- 添加这一行
+#include <string.h>  // <-- 添加这一行
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -94,6 +96,7 @@ int main(void)
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
   DHT11_Data_TypeDef dht_data;
+  char tx_buffer[100]; // 定义一个足够大的缓冲区来存放我们的JSON字符串
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,8 +107,23 @@ int main(void)
 
 
     /* USER CODE BEGIN 3 */
-	  DHT11_Read_Data(&dht_data); // 调用函数读取数据
-	  HAL_Delay(2000); // 延时2秒，DHT11不能读取太快
+	  if (DHT11_Read_Data(&dht_data)) // 检查是否读取成功
+	  {
+	    // 1. 使用 sprintf 将数据格式化为 JSON 字符串
+	    //    - \" 是转义字符，用来在字符串中表示双引号 "
+	    //    - %d 是整数的占位符
+	    //    - \r\n 是回车换行符，非常重要，它将作为我们消息的结束标志
+	    sprintf(tx_buffer, "{\"temp\":%d,\"humi\":%d}\r\n", dht_data.temperature, dht_data.humidity);
+
+	    // 2. 通过 USART2 发送格式化后的字符串
+	    //    - &huart2 是 CubeMX 自动生成的串口句柄
+	    //    - (uint8_t*)tx_buffer 是将字符串强制转换为无符号8位整型指针
+	    //    - strlen(tx_buffer) 是字符串的实际长度
+	    //    - HAL_MAX_DELAY 是超时时间，表示一直等待直到发送完成
+	    HAL_UART_Transmit(&huart2, (uint8_t*)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+	  }
+
+	  HAL_Delay(2000); // 延时2秒再进行下一次读取和发送
   }
   /* USER CODE END 3 */
 }

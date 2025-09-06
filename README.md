@@ -52,54 +52,6 @@
 
 ---
 
-### 快速开始 (Quick Start)
-
-- 环境准备（边缘端）
-  - 安装 Python 3.10+，执行依赖安装：
-```bash
-pip install -r Saffron_Edge_Server/requirements.txt
-```
-- 固件烧录（设备端）
-  - 使用 STM32CubeIDE 打开 `Saffron_STM32_Core/Saffron_STM32_Core.ioc`，生成/编译并下载固件到 NUCLEO-L476RG。
-  - 固件默认通过 `USART2@115200` 每 2 秒发送一行以 `\r\n` 结尾的 JSON。
-- 启动边缘服务（树莓派/开发机）
-```bash
-python Saffron_Edge_Server/app.py
-```
-  - 如遇串口权限错误（Arch 常见），执行：
-```bash
-sudo usermod -aG uucp $USER && newgrp uucp
-```
-  - 设备名默认 `/dev/ttyACM0`，如不同请在 `Saffron_Edge_Server/app.py` 中调整。
-- 访问前端
-  - 浏览器打开 `http://<树莓派IP或本机IP>:5000/` 查看实时温湿度。
-- 可选验证（仅串口）
-```bash
-python Saffron_Edge_Server/serial_test.py
-```
-
-### API 与数据格式
-
-- GET `/api/v1/sensors/latest`
-  - 返回最新一次缓存的传感器数据。
-  - 响应示例：
-```json
-{"temperature": 25, "humidity": 60, "timestamp": "2025-05-01 12:00:00"}
-```
-
-- MCU → 边缘 上行数据（串口逐行，结尾必须是 `\r\n`）：
-```text
-{"temp":25,"humi":60}\r\n
-```
-  - 字段映射：`temp` → `temperature`，`humi` → `humidity`。
-
-- 边缘 → MCU 下行控制（当前固件已支持 LED 开关，需以 `\n` 结尾）：
-```text
-{"actuator":"led","action":"on"}\n
-```
-  - 注意：必须包含换行 `\n` 作为结束符（固件以换行判定一条命令结束）。
-  - 计划中的 HTTP 控制 API（待实现）：`POST /api/v1/control`，由后端将 JSON 指令转发至串口。
-
 ## 🚀 敏捷开发冲刺计划 (Agile Development Sprint Plan) - 精细化任务分解
 
 鉴于项目周期，我们采用以**周**为单位的冲刺（Sprint）模式。每个任务都被分解为具体、可执行的子任务。

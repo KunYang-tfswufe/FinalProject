@@ -62,26 +62,7 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 
 ## ✅ 项目规划清单 (Project Planning Checklist)
 
-1.  **一句话项目描述:** `这个项目是做什么的？`
-    > 答：一个集STM32数据采集、树莓派边缘处理、MQTT云通信和PWA跨平台控制于一体的藏红花智能培育物联网系统。
-2.  **目标用户画像:** `我在为谁开发？`
-    > 答：小王，一名对现代农业技术充满热情的智能农业专业学生或研究员。他希望通过自动化技术提高藏红花的种植效率和品质，并能随时随地通过手机或电脑（无论在本地还是外网）监控和管理培育环境。
-3.  **MVP 功能列表:** `必须实现的核心功能有哪些？`
-    > 1.  STM32能采集多路环境数据并上报给树莓派。
-    > 2.  树莓派能接收数据、存入本地数据库，并通过API提供给前端。
-    > 3.  PWA前端能实时展示来自API的环境数据。
-    > 4.  用户能在PWA前端下发控制指令。
-    > 5.  STM32能接收并执行树莓派转发来的控制指令。
-    > 6.  树莓派能将数据推送到云端MQTT服务器。
-4.  **技术栈清单:**
-    > - **感知控制层 (STM32):** C语言, STM32 HAL库
-    > - **边缘计算层 (树莓派):** Python, Flask, SQLAlchemy, Gunicorn, Paho-MQTT
-    > - **云服务层:** 公共/自建 MQTT Broker (如 EMQX, Mosquitto)
-    > - **应用表现层 (Web/PWA):** 原生 HTML/CSS/JavaScript（无框架），可选引入 ECharts（CDN）用于图表
-    > - **可选（边缘视觉 AI）:** OpenCV (Python) 或简单阈值/形态学算法（无训练），若做轻量推理可用 Numpy 实现
-    > - **数据库:** MySQL / MariaDB
-    > - **开发/部署环境:** Arch Linux (开发), Raspberry Pi OS (部署), Nginx（静态资源）
-5.  **高层架构图:**
+5.  **高层架构图(下面是举例):**
     > ```
     > [ 感知控制层 ]          [ 边缘计算层 ]             [ 云服务层 ]             [ 应用表现层 ]
     > +-------------+        +----------------------+   +--------------+         +--------------+
@@ -92,82 +73,12 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
     >                        | + MQTT Client        |---/              |
     >                        +----------------------+
     > ```
-6.  **核心数据模型/表结构:** `项目的数据骨架，满足6张表要求。`
-    > 答：详见下文 **“核心数据模型 (数据库设计)”** 章节。
-7.  **主要页面线框图:**
-    > - **登录页:** 用户名、密码输入。
-    > - **数据仪表盘 (Dashboard):** 实时数据显示卡片、设备状态、ECharts实时曲线图、快捷控制开关；（可选）自动灌溉策略开关与阈值设置，边缘视觉告警指示。
-    > - **历史数据页:** 按日期/时间范围查询历史数据，并以图表和表格形式展示。
-    > - **后台管理页 (Admin):** 用户管理、角色权限分配、设备管理。
-8.  **任务列表/看板:**
-    > 答：见下文的 **“敏捷开发冲刺计划”**，已分解为四周的冲刺任务。
-9.  **一个优秀的 README.md 草稿:**
-    > 答：本文档本身即为项目 README 的持续演进版本。
 
 ---
 
 ## 核心数据模型 (数据库设计)
 
 为满足毕业设计要求，系统设计以下6张核心数据表，均采用MySQL/MariaDB存储。
-
-1.  **用户表 (users)**
-    - `id` (INT, PK, AI): 用户ID
-    - `username` (VARCHAR, UNIQUE): 用户名
-    - `password_hash` (VARCHAR): 加密后的密码
-    - `email` (VARCHAR, UNIQUE): 电子邮箱
-    - `created_at` (DATETIME): 创建时间
-
-2.  **角色表 (roles)**
-    - `id` (INT, PK, AI): 角色ID
-    - `role_name` (VARCHAR, UNIQUE): 角色名称 (如 'admin', 'observer')
-
-3.  **用户角色关联表 (user_roles)**
-    - `user_id` (INT, FK -> users.id): 用户ID
-    - `role_id` (INT, FK -> roles.id): 角色ID
-
-4.  **设备表 (devices)**
-    - `id` (INT, PK, AI): 设备ID
-    - `device_name` (VARCHAR): 设备名称 (如 '一号培育箱')
-    - `location` (VARCHAR): 物理位置
-    - `status` (VARCHAR): 设备状态 ('online', 'offline')
-    - `last_seen` (DATETIME): 最后在线时间
-
-5.  **传感器数据表 (sensor_data)**
-    - `id` (BIGINT, PK, AI): 数据记录ID
-    - `device_id` (INT, FK -> devices.id): 所属设备ID
-    - `timestamp` (DATETIME, INDEX): 采集时间戳
-    - `temperature` (FLOAT): 温度 (°C)
-    - `humidity` (FLOAT): 湿度 (%)
-    - `light_intensity` (FLOAT): 光照强度 (lux)
-    - `soil_moisture` (FLOAT): 土壤湿度 (%)
-
-6.  **控制日志表 (control_logs)**
-    - `id` (BIGINT, PK, AI): 日志ID
-    - `user_id` (INT, FK -> users.id): 操作用户ID
-    - `device_id` (INT, FK -> devices.id): 被控设备ID
-    - `actuator` (VARCHAR): 被控执行器 (如 'water_pump', 'led_light')
-    - `action` (VARCHAR): 执行动作 (如 'ON', 'OFF')
-    - `timestamp` (DATETIME): 操作时间
-    - `result` (VARCHAR): 执行结果 ('success', 'failed')
-
-> 可选扩展表：若启用自动水泵策略与边缘视觉告警
-
-7.  **灌溉策略表 (irrigation_policies)**
-    - `id` (INT, PK, AI)
-    - `device_id` (INT, FK -> devices.id)
-    - `enabled` (BOOLEAN): 是否启用自动灌溉
-    - `soil_threshold_min` (FLOAT): 土壤湿度下限阈值 (%)
-    - `watering_seconds` (INT): 每次浇水时长（秒）
-    - `created_at` (DATETIME)
-    - `updated_at` (DATETIME)
-
-8.  **视觉告警表 (vision_alerts)**
-    - `id` (BIGINT, PK, AI)
-    - `device_id` (INT, FK -> devices.id)
-    - `timestamp` (DATETIME, INDEX)
-    - `alert_type` (VARCHAR): 如 'pest', 'mold', 'growth_anomaly'
-    - `confidence` (FLOAT): 告警置信度（0-1）
-    - `snapshot_path` (VARCHAR): 截图或短视频路径（可选）
 
 ---
 
@@ -178,16 +89,6 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 ---
 
 ### 要求符合性映射（与“2026届功能实现要求”逐条对照）
-
-- （1）编程语言与主体业务逻辑：已采用 C（STM32）与 Python（Flask）。端到端链路与控制闭环明确，主体业务逻辑覆盖数据采集、传输、展示与控制。
-- （2）分层架构与视图分离：四层架构（感知/边缘/云/表现）已定义；后端 API 与前端模板、静态资源分离。
-- （3）UI 适配显示：采用原生 HTML/CSS/JS，使用媒体查询与响应式布局适配移动/桌面端；可选在仪表盘增加自动灌溉策略开关与视觉告警提示组件。
-- （4）数据库与不少于 6 表、存储过程/触发器：设计了 `users/roles/user_roles/devices/sensor_data/control_logs` 六表；后续补充存储过程与触发器并在第三周任务落实。
-- （5）测试用例与稳定性：第四周计划系统测试与压力测试，覆盖正常/异常场景。
-- （6）MCU 智能应用与联网：STM32 采集 DHT11 数据，串口与边缘服务器通信；预留执行器控制（MOSFET/LED/水泵，5V 方案）。
-- （7）ARM 侧（边缘）联网与控制：树莓派运行 Flask 与 MQTT 客户端，实现数据上报与指令转发。
-- （8）物联网系统集成：感知、控制、网络与应用端一体化，使用合适的中间件（MQTT）；可选引入边缘视觉与自动灌溉策略形成闭环。
-- （9）三端互通：硬件端（STM32）、边缘/云端（Flask + MQTT）、应用端（Web/PWA）贯通。
 
 ### **第一周：核心链路贯通 (The "Tracer Bullet" Sprint)**
 
@@ -441,4 +342,3 @@ HARDWARE.md是我已有的硬件的列表,如果需要另外的硬件我额外�
 - 采购补齐：5V 执行器链路（泵/灯）、3.3V 兼容驱动、精度更高的光照/土壤/温度传感器。
 - 演示物品：藏红花（当季）或红色系现成盆栽/快速发芽作物；盆+土+水路耗材。
 - 安全/可靠：强弱电与水路隔离，执行器与树莓派分离供电但共地，电机端并联续流保护。
-

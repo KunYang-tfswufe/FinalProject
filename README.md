@@ -44,13 +44,61 @@
   - **开发者操作系统:** **Arch Linux**
   - **嵌入式IDE:** **STM32CubeIDE**
   - **嵌入式调试工具:** **`minicom`** (串口通信测试)
-  - **6张数据库表**
+  - **数据库**: 计划至少 6 张业务表
 
 - **硬件选型:**
-  - **微控制器 (MCU):** `STM32L476RGT6U` (原型开发板: **NUCLEO-L476RG**)
+  - **微控制器 (MCU):** `STM32L476RGT6` (原型开发板: **NUCLEO-L476RG**)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
 
 ---
+
+### 快速开始 (Quick Start)
+
+- 环境准备（边缘端）
+  - 安装 Python 3.10+，执行依赖安装：
+```bash
+pip install -r Saffron_Edge_Server/requirements.txt
+```
+- 固件烧录（设备端）
+  - 使用 STM32CubeIDE 打开 `Saffron_STM32_Core/Saffron_STM32_Core.ioc`，生成/编译并下载固件到 NUCLEO-L476RG。
+  - 固件默认通过 `USART2@115200` 每 2 秒发送一行以 `\r\n` 结尾的 JSON。
+- 启动边缘服务（树莓派/开发机）
+```bash
+python Saffron_Edge_Server/app.py
+```
+  - 如遇串口权限错误（Arch 常见），执行：
+```bash
+sudo usermod -aG uucp $USER && newgrp uucp
+```
+  - 设备名默认 `/dev/ttyACM0`，如不同请在 `Saffron_Edge_Server/app.py` 中调整。
+- 访问前端
+  - 浏览器打开 `http://<树莓派IP或本机IP>:5000/` 查看实时温湿度。
+- 可选验证（仅串口）
+```bash
+python Saffron_Edge_Server/serial_test.py
+```
+
+### API 与数据格式
+
+- GET `/api/v1/sensors/latest`
+  - 返回最新一次缓存的传感器数据。
+  - 响应示例：
+```json
+{"temperature": 25, "humidity": 60, "timestamp": "2025-05-01 12:00:00"}
+```
+
+- MCU → 边缘 上行数据（串口逐行，结尾必须是 `\r\n`）：
+```text
+{"temp":25,"humi":60}\r\n
+```
+  - 字段映射：`temp` → `temperature`，`humi` → `humidity`。
+
+- 边缘 → MCU 下行控制（当前固件已支持 LED 开关，需以 `\n` 结尾）：
+```text
+{"actuator":"led","action":"on"}\n
+```
+  - 注意：必须包含换行 `\n` 作为结束符（固件以换行判定一条命令结束）。
+  - 计划中的 HTTP 控制 API（待实现）：`POST /api/v1/control`，由后端将 JSON 指令转发至串口。
 
 ## 🚀 敏捷开发冲刺计划 (Agile Development Sprint Plan) - 精细化任务分解
 
@@ -76,7 +124,7 @@
   - [x] **[验证] 调试器验证:** 使用调试器 (Debugger) 设置断点，查看变量值，确认能读到非零的温湿度数据。
 
 - #### **任务 1.2: STM32 数据格式化与串口发送**
-  - [x] **JSON 格式化:** 在主循环中，使用 `sprintf` 将读取到的温湿度值格式化为 JSON 字符串 (e.g., `{"temp":25.5,"humi":60.1}\r\n`)。 **注意：** 必须包含换行符 `\r\n` 作为消息结束符。
+  - [x] **JSON 格式化:** 在主循环中，使用 `sprintf` 将读取到的温湿度值格式化为 JSON 字符串 (e.g., `{"temp":25,"humi":60}\r\n`)。DHT11 输出为整数；若改用 BME280/DS18B20 再采用小数。 **注意：** 必须包含换行符 `\r\n` 作为消息结束符。
   - [x] **UART 发送:** 调用 `HAL_UART_Transmit()` 函数将格式化后的字符串通过串口发送出去。
   - [x] **添加延迟:** 在循环中加入 `HAL_Delay()` 确保发送频率不会过高 (e.g., 每 2-5 秒一次)。
   - [x] **[验证] Arch Linux 串口监听:** 使用 `minicom -D /dev/ttyACM0 -b 115200` (或类似命令) 确认能持续收到正确的 JSON 数据流。
@@ -108,13 +156,14 @@
 **🎯 本周目标：** 在核心链路基础上，扩展所有传感器，实现反向控制，并引入数据库进行数据持久化；可选打通“自动水泵策略”的最简闭环。
 
 - #### **任务 2.1: STM32 功能扩展与反向控制**
-  - [x] **多传感器集成:** 编写光照强度、土壤湿度传感器的驱动代码，并将其数据加入到上报的 JSON 结构中。
+  - [ ] **多传感器集成:** 编写光照强度、土壤湿度传感器的驱动代码，并将其数据加入到上报的 JSON 结构中。
   - [ ] **执行器控制:** 使用 CubeMX 配置一个 GPIO 为推挽输出模式，用于驱动 MOSFET 模块（LED/5V 水泵）。
   - [ ] **控制函数编写:** 编写 `pump_on()` 和 `pump_off()` 函数来控制 GPIO 的高低电平。
-  - [ ] **串口接收中断:** 配置 UART 接收中断，将收到的字符存入一个缓冲区。
-  - [ ] **命令解析:** 在主循环中检查接收缓冲区，解析收到的 JSON 命令 (e.g., `{"actuator": "pump", "action": "on"}`)，并调用相应的控制函数。
+  - [x] **串口接收中断:** 配置 UART 接收中断并按行组帧，将收到的字符存入缓冲区（已实现）。
+  - [x] **命令解析（LED）:** 支持解析 `{"actuator":"led","action":"on|off"}` 并控制板载 LED；泵指令待接入。
+  - [ ] **命令解析（泵）:** 解析 `{"actuator":"pump","action":"on|off"}` 并调用 `pump_on/off()`。
   - [ ] **自动灌溉（可选，最小可行）:** 在边缘端新增后台任务（线程/定时器），周期拉取最新土壤湿度与策略：若 `enabled=true` 且 `soil_moisture < soil_threshold_min`，自动发送 `pump_on` 指令并按 `watering_seconds` 后 `pump_off`；写入 `control_logs`。
-  - [ ] **[验证] 串口调试助手:** 使用 PC 串口工具发送控制 JSON，观察 STM32 上的 MOSFET/LED 或 5V 水泵是否动作。
+  - [ ] **[验证] 串口调试助手:** 使用 PC 串口工具发送控制 JSON，先验证 LED 指令，再验证 5V 水泵动作。
 
 - #### **任务 2.2: 后端数据库集成**
   - [ ] **数据库安装:** 在树莓派上安装 MariaDB/MySQL，并创建一个专用数据库和用户。
@@ -235,7 +284,6 @@ HW-072
 HW-61
 HW-478
 HW-095
-DH11
 DHT11
 MH-FMD Low level trigger
 Tracker Sensor

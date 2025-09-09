@@ -47,6 +47,7 @@
   - **数据库**: 计划至少 6 张业务表
 
 - **硬件选型:**
+  - **不使用STM32L476RGT6了使用我另一款stm32并采用万能底板去立创开源等地方找或者例如https://m.bilibili.com/video/BV1ti4y1Q7ch?spm_id_from=333.337.search-card.all.click**
   - **微控制器 (MCU):** `STM32L476RGT6` (原型开发板: **NUCLEO-L476RG**)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
   - **PCB方案是为NUCLEO-L476RG设计扩展板;或者直接使用开源的NUCLEO社区兼容板:https://oshwhub.com/c70e/imitation-nucleo-official-universal-development-board-version-20**

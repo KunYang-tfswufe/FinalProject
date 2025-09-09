@@ -49,7 +49,7 @@
 - **硬件选型:**
   - **微控制器 (MCU):** `STM32L476RGT6` (原型开发板: **NUCLEO-L476RG**)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
-  - **PCB方案是为NUCLEO-L476RG设计扩展板**
+  - **PCB方案是为NUCLEO-L476RG设计扩展板;或者直接使用开源的NUCLEO社区兼容板:https://oshwhub.com/c70e/imitation-nucleo-official-universal-development-board-version-20**
 
 ---
 

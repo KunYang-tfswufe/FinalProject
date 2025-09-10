@@ -114,3 +114,13 @@ STM32F411CE: `/SDK/STM32F411CEU6/MicroPython/WeAct_F411CE`
 ## Board Shape
 
 ![STM32F4X1 V2.0+](./images/STM32F4x1-V20+BoardShape.png "Board Shape")
+
+```
+下载烧录问题汇总
+ISP下载
+
+按住BOOT0键和NRST键，然后松开NRST键，0.5秒后松开BOOT0键，即可进入串口下载或DFU下载。USB连接MCU的TYPE-C接口或者串口连接PA9、PA10，下载软件推荐STM32CubeProg。
+串口下载
+
+使用USB转串口（例如：CH340）时，将TX连接到PA10，RX连接到PA9。同时不要将MCU的Type-C连接到电脑，必须使用外部供电，不然会影响MCU下载。
+```

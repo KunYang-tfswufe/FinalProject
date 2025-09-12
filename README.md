@@ -61,8 +61,8 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
   - **数据库**: 计划至少 6 张业务表
 
 - **硬件选型:**
-  - **微控制器 (MCU):** **WeAct STM32F411CEU6 "黑药丸"** (WeAct官方旗舰店购买)
-  - **开发环境:** **MicroPython v1.26.1** (官方固件)
+  - **微控制器 (MCU):** **WeAct STM32F411CEU6 "黑药丸"** (WeAct官方旗舰店购买,因为其MicroPython固件受MicroPython官方支持可以直接从官网找到WeActSTM32F411进行下载固件)
+  - **开发环境:** **MicroPython v1.26.1** (受MicroPython官方团队维护固件)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
   - **硬件更换原因:** 原NUCLEO-L476RG开发板损坏，改用WeAct STM32F411黑药丸
   - **技术优势:** STM32F411性能更强(100MHz vs 84MHz)，支持硬件级DHT读取，开发效率更高

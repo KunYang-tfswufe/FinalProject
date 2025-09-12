@@ -33,6 +33,13 @@
 密码例如:let*********3(星号为加密部分)
 ```
 
+##
+
+```shell
+# 烧录MicroPython固件
+cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm32f4x.cfg -c "program WEACT_F411_BLACKPILL-V31_FLASH_8M-20250911-v1.26.1.hex verify reset exit"
+```
+
 ## 项目核心背景信息 (Project Core Context)
 
 为了方便AI/LLM在后续对话中快速理解上下文，以下是截至当前时间点的项目核心背景信息摘要。

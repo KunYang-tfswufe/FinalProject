@@ -298,3 +298,40 @@ GY-302 数字光强度 光照传感器
 MOS场效应管电子开关控制模块 脉冲触发板 DC直流 带光耦隔离
 1N5819 1A 40V (20个)
 树莓派USB免装驱动摄像头
+
+# MicroPython黑药丸亮灯极简教程
+
+### 1. 代码 (`main.py`)
+
+把它保存到你电脑。这段代码**健壮**且**简洁**。
+
+```python
+from machine import Pin
+import time
+
+# 定义PC13为LED，并设置为输出
+led = Pin(Pin.cpu.C13, Pin.OUT)
+# 强制设为'灭'状态启动，避免出错
+led.high()
+
+# 无限循环：翻转LED状态 -> 等待 -> 重复
+while True:
+    led.toggle()
+    time.sleep_ms(500)
+```
+
+### 2. 部署 (终端命令)
+
+在终端运行这**一行命令**即可。
+
+```bash
+# 上传代码，然后干净地重启开发板
+mpremote fs cp main.py :main.py && mpremote reset
+```
+
+现在，看你的板子。灯应该在闪。
+
+---
+
+> **备选方案**: 如果上面的命令无效, 就分两步:
+> `mpremote fs cp main.py :main.py`, 然后\*\*按一下板上的 `RESET` 按钮

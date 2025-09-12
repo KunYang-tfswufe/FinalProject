@@ -48,13 +48,9 @@
 
 - **硬件选型:**
   - **不使用STM32L476RGT6了使用我另一款stm32并采用万能底板去立创开源等地方找或者例如https://m.bilibili.com/video/BV1ti4y1Q7ch?spm_id_from=333.337.search-card.all.click**
-  - **我找到一个更好的选择，黑药丸，能兼容蓝药丸扩展版**
-  - **疑似黑药丸扩展板https://oshwhub.com/qq1461709003/kai-yuan-si-zhou-fei-xing-qi_copy_copy_copy**
-  - **上面的方案因为方便扩展板也方便直接使用蓝药丸的毕设直接换芯**
+  - **疑似黑药丸扩展板https://oshwhub.com/qq1461709003/kai-yuan-si-zhou-fei-xing-qi_copy_copy_copy 上面的方案因为方便扩展板也方便直接使用蓝药丸的毕设直接换芯**
   - **微控制器 (MCU):** `STM32L476RGT6` (原型开发板: **NUCLEO-L476RG**)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
-  - **PCB方案是为NUCLEO-L476RG设计扩展板;或者直接使用开源的NUCLEO社区兼容板:https://oshwhub.com/c70e/imitation-nucleo-official-universal-development-board-version-20**
-  - **之后直接买X-NUCLEO兼容板作为底板**
 
 ---
 

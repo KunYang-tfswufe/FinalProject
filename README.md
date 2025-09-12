@@ -306,6 +306,9 @@ MOS场效应管电子开关控制模块 脉冲触发板 DC直流 带光耦隔离
 >>> dir(machine.Pin)
 ['__class__', '__name__', 'dict', 'value', 'AF1_TIM1', 'AF1_TIM2', 'AF2_TIM3', 'AF2_TIM4', 'AF2_TIM5', 'AF3_TIM10', 'AF3_TIM11', 'AF3_TIM9', 'AF4_I2C1', 'AF4_I2C2', 'AF4_I2C3', 'AF5_SPI1', 'AF5_SPI2', 'AF6_SPI3', 'AF7_SPI3', 'AF7_USART1', 'AF7_USART2', 'AF9_I2C2', 'AF9_I2C3', 'AF_OD', 'AF_PP', 'ALT', 'ALT_OPEN_DRAIN', 'ANALOG', 'IN', 'IRQ_FALLING', 'IRQ_RISING', 'OPEN_DRAIN', 'OUT', 'OUT_OD', 'OUT_PP', 'PULL_DOWN', 'PULL_NONE', 'PULL_UP', '__bases__', '__dict__', 'af', 'af_list', 'board', 'cpu', 'debug', 'gpio', 'high', 'init', 'irq', 'low', 'mapper', 'mode', 'name', 'names', 'off', 'on', 'pin', 'port', 'pull']
 >>>
+>>> dir(machine.Pin.cpu)
+['__class__', '__name__', 'A0', 'A1', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'B0', 'B1', 'B10', 'B12', 'B13', 'B14', 'B15', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'C13', 'C14', 'C15', 'H0', 'H1', '__bases__', '__dict__']
+>>>
 ```
 
 # MicroPython黑药丸亮灯极简教程

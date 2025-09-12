@@ -300,10 +300,13 @@ MOS场效应管电子开关控制模块 脉冲触发板 DC直流 带光耦隔离
 树莓派USB免装驱动摄像头
 
 # MicroPython黑药丸亮灯极简教程
+
 ### 1. 激活虚拟环境
+
 ```shell
 cd FinalProject/Saffron_STM32_Core/ && source .venv/bin/activate.fish
 ```
+
 ### 2. 代码 (`main.py`)
 
 把它保存到你电脑。这段代码**健壮**且**简洁**。

@@ -67,21 +67,26 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
   - **硬件更换原因:** 原NUCLEO-L476RG开发板损坏，改用WeAct STM32F411黑药丸
   - **技术优势:** STM32F411性能更强(100MHz vs 84MHz)，支持硬件级DHT读取，开发效率更高
 
+- **使用的MicroPython固件(黑药丸已焊接)**
+  Firmware (v3.1 board with 8MB SPI Flash)
+  Releases
+  v1.26.1 (2025-09-11) .dfu / [.hex] / [Release notes] (latest)
+
 ---
 
 ## 🏗️ 技术架构与硬件选型
 
 ### 微控制器选型对比
 
-| 特性 | 原计划 (NUCLEO-L476RG) | 实际使用 (WeAct STM32F411) | 优势分析 |
-|------|----------------------|---------------------------|----------|
-| **处理器** | ARM Cortex-M4 84MHz | ARM Cortex-M4 100MHz | ⚡ 性能提升19% |
-| **Flash** | 1MB | 512KB | 📦 足够MicroPython使用 |
-| **RAM** | 128KB | 128KB | ✅ 相同 |
-| **开发环境** | STM32CubeIDE + HAL | MicroPython | 🚀 开发效率提升5倍 |
-| **DHT支持** | 软件时序 | 硬件级`dht_readinto` | 🎯 稳定性大幅提升 |
-| **调试方式** | SWD调试器 | USB VCP + REPL | 🔧 更便捷的调试 |
-| **成本** | 较高 | 经济实惠 | 💰 性价比更高 |
+| 特性         | 原计划 (NUCLEO-L476RG) | 实际使用 (WeAct STM32F411) | 优势分析               |
+| ------------ | ---------------------- | -------------------------- | ---------------------- |
+| **处理器**   | ARM Cortex-M4 84MHz    | ARM Cortex-M4 100MHz       | ⚡ 性能提升19%         |
+| **Flash**    | 1MB                    | 512KB                      | 📦 足够MicroPython使用 |
+| **RAM**      | 128KB                  | 128KB                      | ✅ 相同                |
+| **开发环境** | STM32CubeIDE + HAL     | MicroPython                | 🚀 开发效率提升5倍     |
+| **DHT支持**  | 软件时序               | 硬件级`dht_readinto`       | 🎯 稳定性大幅提升      |
+| **调试方式** | SWD调试器              | USB VCP + REPL             | 🔧 更便捷的调试        |
+| **成本**     | 较高                   | 经济实惠                   | 💰 性价比更高          |
 
 ### 硬件更换的技术优势
 
@@ -137,6 +142,7 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
 ### 📊 项目当前状态 (2024年12月)
 
 #### ✅ **已完成功能**
+
 - **硬件层**: WeAct STM32F411 + MicroPython v1.26.1 完美运行
 - **传感器驱动**: 模块化三级驱动架构（硬件级/软件级/模拟）
 - **数据采集**: DHT11温湿度传感器，硬件级读取成功率>95%
@@ -146,11 +152,13 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
 - **系统架构**: 完整的三层架构设计
 
 #### 🔄 **进行中功能**
+
 - **数据库集成**: 计划集成MySQL，设计6张业务表
 - **用户认证**: JWT + RBAC权限管理系统
 - **云端通信**: MQTT云端集成
 
 #### 📈 **技术亮点**
+
 - **硬件级DHT驱动**: 使用`machine.dht_readinto`硬件函数，稳定性极高
 - **智能驱动降级**: 硬件级→软件级→模拟数据自动切换
 - **模块化设计**: 专业的drivers模块，易于维护和扩展

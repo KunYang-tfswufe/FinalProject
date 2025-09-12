@@ -309,15 +309,15 @@ MOS场效应管电子开关控制模块 脉冲触发板 DC直流 带光耦隔离
 from machine import Pin
 import time
 
-# 定义PC13为LED，并设置为输出
+# 定义引脚并强制设置为“灭”的初始状态，保证可靠
 led = Pin(Pin.cpu.C13, Pin.OUT)
-# 强制设为'灭'状态启动，避免出错
-led.high()
 
-# 无限循环：翻转LED状态 -> 等待 -> 重复
+# 显式地控制“亮”和“灭”，行为完全可预测
 while True:
-    led.toggle()
-    time.sleep_ms(500)
+    led.low()   # 亮
+    time.sleep_ms(3000)
+    led.high()  # 灭
+    time.sleep_ms(200)
 ```
 
 ### 2. 部署 (终端命令)

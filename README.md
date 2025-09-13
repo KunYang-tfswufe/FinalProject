@@ -56,7 +56,7 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
 
 - **开发者及环境信息:**
   - **开发者操作系统:** **Arch Linux**
-  - **直接通过SSH连接树莓派4B进行开发,代码全在树莓派上面**
+  - **直接通过SSH连接树莓派4B进行开发,代码全在树莓派上面,Archlinux通过ssh连接树莓派,树莓派通过USB连接STM32F411黑药丸**
   - **嵌入式IDE:** **STM32CubeIDE**
   - **嵌入式调试工具:** **`minicom`** (串口通信测试)
   - **数据库**: 计划至少 6 张业务表

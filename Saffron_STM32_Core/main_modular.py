@@ -116,6 +116,7 @@ while True:
                 # 输出JSON数据到串口（供Flask服务器接收）
                 json_string = json.dumps(data_packet)
                 print(json_string)
+                sys.stdout.flush()  # 确保数据立即输出
                 
                 # 成功指示：LED短闪
                 if status_led:

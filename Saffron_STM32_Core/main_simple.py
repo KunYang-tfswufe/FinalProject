@@ -34,10 +34,12 @@ class GY302:
         except Exception as e:
             raise Exception(f"I2C扫描失败: {e}")
         
-        # 简化BH1750初始化序列
+        # 完整的BH1750初始化序列
+        self.reset()
+        time.sleep_ms(10)
         self.power_on()
         time.sleep_ms(10)
-        self.set_mode(0x20)  # 连续高分辨率模式
+        self.set_mode(0x10)  # 连续高分辨率模式
         time.sleep_ms(180)  # 等待第一次测量完成
     
     def power_on(self):
@@ -60,16 +62,17 @@ class GY302:
                 raw_value = (data[0] << 8) | data[1]
                 if raw_value > 0:
                     lux = raw_value / 1.2
-                    print(f"原始数据: {raw_value}, 光照: {lux:.2f} lux")
+                    # 移除调试输出，避免干扰JSON数据
+                    # print(f"原始数据: {raw_value}, 光照: {lux:.2f} lux")
                     return lux
                 else:
-                    print("光照传感器返回0值")
+                    # print("光照传感器返回0值")
                     return None
             else:
-                print(f"光照传感器数据长度错误: {len(data)}")
+                # print(f"光照传感器数据长度错误: {len(data)}")
                 return None
         except Exception as e:
-            print(f"GY-302读取失败: {e}")
+            # print(f"GY-302读取失败: {e}")
             return None
 
 # 初始化GY-302 (暂时禁用，两个模块都有问题)

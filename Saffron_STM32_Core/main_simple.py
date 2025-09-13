@@ -14,7 +14,7 @@ from dht import DHT11
 sensor_pin = machine.Pin('A1', machine.Pin.IN, machine.Pin.PULL_UP)
 dht11 = DHT11(sensor_pin)
 
-# 初始化I2C总线用于GY-302
+# 初始化I2C总线用于GY-302 (尝试不同频率)
 i2c = machine.I2C(1, freq=100000)
 
 # GY-302 (BH1750) 光照传感器
@@ -34,9 +34,11 @@ class GY302:
         except Exception as e:
             raise Exception(f"I2C扫描失败: {e}")
         
+        # 简化BH1750初始化序列
         self.power_on()
-        self.reset()
+        time.sleep_ms(10)
         self.set_mode(0x20)  # 连续高分辨率模式
+        time.sleep_ms(180)  # 等待第一次测量完成
     
     def power_on(self):
         self.i2c.writeto(self.addr, b'\x01')
@@ -69,13 +71,17 @@ class GY302:
             print(f"GY-302读取失败: {e}")
             return None
 
-# 初始化GY-302
+# 初始化GY-302 (暂时禁用，两个模块都有问题)
 try:
     gy302 = GY302(i2c)
     print("✅ GY-302光照传感器初始化成功")
 except Exception as e:
     print(f"⚠️ GY-302初始化失败: {e}")
     gy302 = None
+
+# 暂时禁用光照传感器，因为两个模块数据都固定不变
+print("⚠️ 光照传感器暂时禁用 - 两个模块数据都固定不变，可能型号不对")
+gy302 = None
 
 # 初始化土壤湿度传感器 (ADC)
 try:

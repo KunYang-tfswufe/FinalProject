@@ -43,6 +43,7 @@ class GY302:
     def power_on(self):
         self.i2c.writeto(self.addr, b'\x01')
     
+    
     def reset(self):
         self.i2c.writeto(self.addr, b'\x07')
     

@@ -13,6 +13,7 @@ latest_data = {
     "temperature": None,
     "humidity": None,
     "lux": None,
+    "soil": None,
     "timestamp": None
 }
 
@@ -50,6 +51,7 @@ def serial_reader():
                             latest_data['temperature'] = data.get('temp')
                             latest_data['humidity'] = data.get('humi')
                             latest_data['lux'] = data.get('lux')
+                            latest_data['soil'] = data.get('soil')
                             latest_data['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S')
                         
                     except (UnicodeDecodeError, json.JSONDecodeError, KeyError) as e:

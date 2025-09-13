@@ -4,6 +4,7 @@
 import machine
 import time
 import json
+import sys
 
 print("=== 藏红花培育系统 v6.0 - 模块化版本 ===")
 print("使用专业模块化传感器驱动")

@@ -137,3 +137,93 @@
 #     TIM6 & TIM7 仅被 DAC 使用，在芯片封装和该板设计中没有对应外部引脚（如图片右下注记）。
 #     在 F401 系列上，图示的多数引脚对 5V 是容忍的（请以芯片数据手册和板上设计为准）。
 #     在 F411 系列上，图中注明的 Pin 10 (PA0) 与 Pin 41 (PB5) 在某些封装/板子上不是 5V 容忍（仅 3.3V）；请以实际芯片/板子说明为准。
+
+# STM32F411xC/xE 微控制器架构框图（基于 MSv34920V2） — 修正版
+#
+# 本文档基于你从图片转换而来的文本进行校对与补充，修正了若干 OCR/语义错误并补充了缺失的注记（尤其是电源、定时器与调试信号相关的说明）。目标是产生一份完整、精确并且对 Cursor 等 AI 代码编辑器友好的 Markdown 上下文文件。
+# 总体说明
+#
+# 该文档描述 STM32F411xC/xE 系列微控制器的内部架构框图要点，包括 Cortex-M4 内核、总线矩阵、闪存/SRAM、DMA、外设（GPIO、USART、SPI、I2C、ADC、TIM、USB、SDIO 等）、电源管理与时钟源、备份域与 RTC、调试与追踪接口等。
+#
+# 重要的纠正与补充（须知）：
+#
+#     APB 总线频率限制与定时器时钟（TIMxCLK）行为已明确区分（见“时钟与定时器”部分）。
+#     补充并明确列出了电源引脚（VDD、VDDA、VSSA、VCAP、VBAT 等）及其电压范围与注记（PDR ON/OFF 状态）。
+#     统一并纠正了调试/追踪引脚名称（JTAG/SWD、ETM、TRACECLK、TRACED[3:0] 等）。
+#     补充了 AHB 总线矩阵（masters/slaves）与 DMA 流数、FIFO 说明、CRC 所在总线层次的明确注记。
+#
+# 结构化内容（逐项详述）
+# CPU 与 Debug / Trace
+#
+#     CPU: ARM Cortex-M4，含 FPU，最高 100 MHz。
+#     内部模块：MPU（内存保护单元）、NVIC（中断控制器）、ETM（嵌入式跟踪模块）、JTAG & SW。
+#     总线接口：I-BUS (指令总线)、D-BUS (数据总线) 与 S-BUS (系统总线) 连接到 AHB 总线矩阵。
+#     调试 / 追踪信号（建议使用原图精确命名）:
+#         NJTRST, JTDI, JTCK/SWCLK, JTDO/SWDIO（或 TDO/SWO 取决具体封装），
+#         TRACECLK, TRACED[3:0]（跟踪数据线 D0..D3），ETM。
+#         注意：OCR 可能把 JTDO/SWDIO 写成 JTDO/SWD，请以原图为准。
+#
+# 存储器
+#
+#     512 KB Flash（含加速/指令 cache 注记）
+#     128 KB SRAM
+#     备份寄存器（Backup registers，位于备份域并由 VBAT 供电）
+#
+# 总线矩阵（AHB bus matrix）
+#
+#     图中标注为多主机 / 多从机的 AHB 矩阵（常见为若干 masters (CPU、DMA1、DMA2、AHB masters) 与 slaves (Flash, SRAM, 外设寄存器等)）。
+#     CRC 模块位于 AHB/外设侧（按原图位置可视为靠近 Reset & Clock 控制域的一部分）。
+#
+# DMA
+#
+#     DMA1 与 DMA2：均支持多 Streams（例如图上标注 8 Streams）并带 FIFO 功能（各 stream 有 FIFO 支持以优化内存/外设传输效率）。
+#     DMA 与 AHB/ APB 总线连接以实现内存与外设间的数据传输。
+#
+# 外设汇总（按总线分组）
+#
+#     GPIO PORT A..E, H（PA[15:0], PB[15:0], PC[15:0], PD[15:0], PE[15:0], PH[1:0]）
+#     定时器：TIM1（高级 16-bit）、TIM2（32-bit）、TIM3（16-bit）、TIM4（16-bit）、TIM5（32-bit）、TIM9/10/11（16-bit）等。
+#         TIM1: 先进的定时器，支持互补输出、死区、BKIN 等。
+#         TIM2/5: 32-bit 定时器（更多计数范围）。
+#     通用同步串口与外设：USART1/2/6, SPI1/2/3/4/5, I2C1/2/3, SDIO/MMC, ADC1, USB OTG FS, RTC, WWDG, IWDG（看图为 WDG 32K 驱动）等。
+#     ADC: ADC1，16 个模拟输入，内部温度传感器，参考电压/ADC 引脚注记（VDDREF_ADC / VREF）
+#     SDIO/MMC：支持外接 SD 卡 / MMC
+#     USB OTG FS：含 PHY / FIFO，相关电平与引脚（DP, DM, ID, VBUS, SOF 等）
+#     CRC: 硬件 CRC 加速器，用于外设和数据校验
+#
+# RTC 与备份域
+#
+#     LSE (外部 32.768 kHz 晶振) 输入：OSC32_IN / OSC32_OUT，VBAT 为 RTC 供电，VBAT 范围图上标注 1.65 to 3.6 V。
+#     备份寄存器、RTC alarm/Stamp 输出（ALARM_OUT, STAMP1）
+#
+# 电源与复位（补充并修正）
+#
+#     主要引脚：VDD（主供电），VDDA（模拟供电），VSSA（模拟地），VBAT（备用电池供电给备份域/RTC），VCAP（内核电容引脚）等。
+#     电压范围注记（请以原图精确数值为准，示例）：
+#         VDD = 1.7 to 3.6 V (PDR OFF), 1.8 to 3.6 V (PDR ON) —— 原图分别在不同 PDR 状态下给出不同允许范围，务必以图中标注为最终参考。
+#         VBAT = 1.65 to 3.6 V（用于 RTC/备份域）
+#     电源管理模块：电压调节器、POR/PDR/BOR、PVD（电压检测）、Power interface 等（详见原图）
+#     VCAP：内核电容连接引脚（通常用于内部稳压器的电容）。
+#     VREF_ADC/VDDREF_ADC：ADC 参考/采样电压相关引脚或注记。
+#
+# 时钟、复位与 PLL
+#
+#     系统时钟由 HSE/HSI/PLL/LSI 组合生成，原图有 RC_HS、RC_LS、PLL1&2、XTAL 等模块。
+#     Reset & Clock Control（RCC）位于靠近电源子系统的区域，负责时钟分配、总线 prescaler、外设时钟使能。
+#
+# 时钟与定时器（重要纠正）
+#
+#     APB2 总线：最大运行频率 100 MHz（外设 PCLK2 ≤ 100 MHz）。
+#     APB1 总线：最大运行频率 50 MHz（外设 PCLK1 ≤ 50 MHz）。
+#     定时器时钟（TIMxCLK）：当 APB prescaler ≠ 1 时（即 APB 分频器使 PCLK 发生分频），定时器时钟会是 PCLK 的两倍（这是 ARM 总线/定时器常见行为）。因此 TIMxCLK 最多能达到 100 MHz（适用于 APB1 的定时器在 APB1 被分频时亦可得到 2×PCLK1，从而计数速率可达 100 MHz）。
+#         简单总结：APB1 外设（PCLK1）上限 50 MHz，但 APB1 上的 定时器（例如 TIM2/3/4/5）可以被时钟到 100 MHz（在 prescaler ≠ 1 的情况下）。APB2 外设及定时器的上限为 100 MHz。
+#
+# 外设复用（AF）与引脚复用说明
+#
+#     文档原图中对每个外设旁边标记了可复用的 AF 函数（例如 SPI 的 MOSI/MISO/SCK、USART 的 TX/RX/CTS/RTS、I2C 的 SCL/SDA 等）。OCR 过程中常丢失一些 AF 标签或把 AF 缩写错写，已在本文档中尽量保留关键 AF 注记，例如“RX, TX, CK, CTS, RTS as AF”、“MOSI/SD, MISO/SCK/CK, NSS/WS as AF”等。请在需要精确引脚表时参考芯片参考手册（RM）与封装引脚分配表。
+#
+# 外设通道与位宽（示例）
+#
+#     TIM1：3 个互补通道 + 4 个通道 + BKIN as AF（图中有“3 compl. channels TIM1_CH1[1:3]N, 4 channels TIM1_CH1[4]ETR, BKIN as AF”之类注记）
+#     TIM2/TIM5：32-bit，TIM3/TIM4/TIM9/TIM10/TIM11：16-bit（以原图标注为准）
+#     ADC：16 个模拟输入（ADC1）

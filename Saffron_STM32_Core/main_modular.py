@@ -89,99 +89,43 @@ print("-" * 50)
 cycle_count = 0
 
 while True:
+    cycle_count += 1
     try:
-        cycle_count += 1
+        # 1. 执行测量
+        measurement_ok = dht11.measure()
         
-        # 执行传感器测量
-        if dht11.measure():
-            # 获取传感器数据
+        if measurement_ok:
+            # 2. 获取数据
             sensor_data = dht11.get_data()
             
-            if sensor_data['is_valid']:
-                # 构建完整的数据包
+            if sensor_data.get('is_valid'):
+                # 3. 构建数据包
                 data_packet = {
-                    "temp": sensor_data['temperature'],
-                    "humi": sensor_data['humidity'],
+                    "temp": sensor_data.get('temperature'),
+                    "humi": sensor_data.get('humidity'),
                     "cycle": cycle_count,
-                    "driver": sensor_data['driver_mode'],
-                    "sensor_type": sensor_data['sensor_type'],
-                    "timestamp": time.ticks_ms(),
-                    "system_version": "6.0_modular"
+                    "driver": sensor_data.get('driver_mode'),
+                    "success_rate": dht11.get_status().get('success_rate'),
+                    "timestamp": time.ticks_ms()
                 }
                 
-                # 添加传感器状态信息
-                current_status = dht11.get_status()
-                data_packet["success_rate"] = current_status['success_rate']
-                data_packet["total_reads"] = current_status['read_count']
+                # 4. 打印 JSON (这是与树莓派通信的关键)
+                print(json.dumps(data_packet))
                 
-                # 输出JSON数据到串口（供Flask服务器接收）
-                json_string = json.dumps(data_packet)
-                print(json_string)
-                sys.stdout.flush()  # 确保数据立即输出
-                
-                # 成功指示：LED短闪
+                # 5. 成功闪灯
                 if status_led:
                     status_led.low()
                     time.sleep_ms(50)
                     status_led.high()
-                    
             else:
-                raise SensorError("传感器返回无效数据")
-                
+                print("# 错误: 传感器返回无效数据")
+
         else:
-            raise SensorError("传感器测量失败")
-            
-    except SensorError as e:
-        print(f"❌ 传感器错误 #{cycle_count}: {e}")
-        
-        # 传感器错误指示：双闪
-        if status_led:
-            for _ in range(2):
-                status_led.low()
-                time.sleep_ms(150)
-                status_led.high()
-                time.sleep_ms(150)
-                
+            print("# 错误: 传感器测量失败")
+
     except Exception as e:
-        print(f"❌ 系统错误 #{cycle_count}: {e}")
-        
-        # 系统错误指示：三闪
-        if status_led:
-            for _ in range(3):
-                status_led.low()
-                time.sleep_ms(100)
-                status_led.high()
-                time.sleep_ms(100)
+        # 捕获任何意外错误
+        print(f"# 系统错误 #{cycle_count}: {e}")
     
-    # 周期性状态报告（每20个周期）
-    if cycle_count % 20 == 0:
-        status = dht11.get_status()
-        print(f"# 📊 系统运行报告 (周期 {cycle_count}):")
-        print(f"#    成功率: {status['success_rate']}")
-        print(f"#    驱动模式: {dht11.driver_mode}")
-        print(f"#    总读取次数: {status['read_count']}")
-        print(f"#    错误次数: {status['error_count']}")
-        
-        # 检查是否需要重置统计
-        if status['error_count'] > 100:
-            print("# 🔄 重置传感器统计信息...")
-            dht11.reset_statistics()
-    
-    # 智能延迟调整
-    current_status = dht11.get_status()
-    error_rate = float(current_status['success_rate'].rstrip('%'))
-    
-    if error_rate >= 90:
-        sleep_time = 2      # 高成功率：2秒间隔
-    elif error_rate >= 70:
-        sleep_time = 3      # 中成功率：3秒间隔  
-    elif error_rate >= 50:
-        sleep_time = 5      # 低成功率：5秒间隔
-    else:
-        sleep_time = 8      # 很低成功率：8秒间隔
-    
-    # 模拟数据模式使用固定间隔
-    if dht11.driver_mode == "simulated":
-        sleep_time = 2
-    
-    time.sleep(sleep_time)
+    # 6. 等待下一个周期 (固定2秒，方便调试)
+    time.sleep(2)

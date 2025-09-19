@@ -203,6 +203,8 @@ class HardwareDHTDriver:
     def measure(self):
         """硬件级读取"""
         try:
+        # 核心修复: 确保每次读取前引脚模式都正确
+            self.pin.init(self.pin.IN, self.pin.PULL_UP)
             # 使用硬件级函数读取
             self.dht_readinto(self.pin, self.buf)
             

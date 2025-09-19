@@ -68,7 +68,7 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
   - **硬件更换原因:** 原NUCLEO-L476RG开发板损坏，改用WeAct STM32F411黑药丸
   - **技术优势:** STM32F411性能更强(100MHz vs 84MHz)，支持硬件级DHT读取，开发效率更高
 
-- **请注意开发与测试阶段数据库和Flask Web服务都先在树莓派4B上,部署与生产阶段将数据库和Flask Web服务器都移植到云服务器**
+- **请注意开发与测试阶段数据库(开发阶段先使用sqlite,如果有精力在更换为更符合题意的Mysql)和Flask Web服务都先在树莓派4B上,部署与生产阶段将数据库和Flask Web服务器都移植到云服务器**
 - **已安装以下固件MicroPython固件(我购买的黑药丸版本非默认发货板,而是已焊接焊Flash(8MB)+焊排针(向下)-立芯的版本)**
   Firmware (v3.1 board with 8MB SPI Flash)
   Releases
@@ -197,7 +197,7 @@ mip install ssd1306     # OLED显示
 
 #### 🔄 **进行中功能**
 
-- **数据库集成**: 计划集成MySQL，设计6张业务表
+- **数据库集成**: 计划集成数据库(开发阶段先使用sqlite,如果有精力在更换为更符合题意的Mysql)，设计6张业务表
 - **用户认证**: JWT + RBAC权限管理系统
 - **云端通信**: MQTT云端集成
 - **多传感器扩展**: 光照、土壤湿度等传感器集成

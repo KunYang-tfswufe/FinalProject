@@ -3,134 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>藏红花培育系统 - 实时监控</title>
+    <title>藏红花培育系统 - 实时监控与控制</title>
     <style>
-        /* 页面基础样式 */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f2f5;
-            color: #333;
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f0f2f5; color: #333; }
+        .dashboard { background-color: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); text-align: center; width: 90%; max-width: 600px; }
+        h1 { margin-top: 0; color: #1a73e8; }
+        .sensors-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
+        .data-card { font-size: 1.2em; display: flex; align-items: center; justify-content: center; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a73e8; flex-wrap: wrap;}
+        .data-card span { font-weight: bold; color: #e67e22; min-width: 60px; display: inline-block; text-align: left; padding: 0 10px; }
+        #timestamp { margin-top: 30px; font-size: 0.9em; color: #777; }
+
+        /* 新增样式 */
+        .controls { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        .control-btn {
+            font-size: 1em;
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
         }
-        /* 仪表盘容器样式 */
-        .dashboard {
-            background-color: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px_12px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            min-width: 400px;
-            max-width: 600px;
-        }
-        /* 主标题样式 */
-        h1 {
-            margin-top: 0;
-            color: #1a73e8; /* 蓝色标题 */
-            font-size: 1.5em; /* 调整字体大小 */
-        }
-        /* 传感器网格布局 */
-        .sensors-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            margin-top: 30px;
-        }
-        
-        /* 数据卡片样式 */
-        .data-card {
-            font-size: 1.8em;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            border-left: 4px solid #1a73e8;
-        }
-        /* 数据数值的span标签样式 */
-        .data-card span {
-            font-weight: bold;
-            color: #e67e22; /* 橙色数据 */
-            min-width: 80px;
-            display: inline-block;
-            text-align: left;
-            padding: 0 10px;
-        }
-        /* 时间戳样式 */
-        #timestamp {
-            margin-top: 30px;
-            font-size: 0.9em;
-            color: #777;
-        }
+        .btn-on { background-color: #28a745; }
+        .btn-on:hover { background-color: #218838; }
+        .btn-off { background-color: #dc3545; }
+        .btn-off:hover { background-color: #c82333; }
+        #control-status { margin-top: 15px; font-style: italic; color: #555; min-height: 1.2em; }
     </style>
 </head>
 <body>
 
     <div class="dashboard">
-        <h1>🌱 藏红花培育环境监控</h1>
+        <h1>🌱 藏红花培育环境监控与控制</h1>
         
         <div class="sensors-grid">
-            <div class="data-card">
-                🌡️ 温度: <span id="temp">--</span> °C
-            </div>
-            <div class="data-card">
-                💧 湿度: <span id="humi">--</span> %
-            </div>
-            <div class="data-card">
-                ☀️ 光照: <span id="lux">--</span> lux
-            </div>
-            <div class="data-card">
-                🌱 土壤湿度: <span id="soil">--</span> %
-            </div>
+            <div class="data-card">🌡️ 温度: <span id="temp">--</span> °C</div>
+            <div class="data-card">💧 湿度: <span id="humi">--</span> %</div>
+            <div class="data-card">☀️ 光照: <span id="lux">--</span> lux</div>
+            <div class="data-card">🌱 土壤: <span id="soil">--</span> %</div>
+        </div>
+
+        <!-- 新增的控制区域 -->
+        <div class="controls">
+            <h2>设备控制</h2>
+            <button id="led-on-btn" class="control-btn btn-on">打开指示灯</button>
+            <button id="led-off-btn" class="control-btn btn-off">关闭指示灯</button>
+            <div id="control-status"></div>
         </div>
         
-        <div id="timestamp">
-            最后更新时间: <span id="update-time">从未</span>
-        </div>
+        <div id="timestamp">最后更新时间: <span id="update-time">从未</span></div>
     </div>
 
     <script>
-        // API的URL现在是一个相对路径。
-        // 浏览器会自动将其解析为 http://<当前域名>:<当前端口>/api/v1/sensors/latest
-        const apiUrl = '/api/v1/sensors/latest';
+        // API URLS
+        const sensorApiUrl = '/api/v1/sensors/latest';
+        const controlApiUrl = '/api/v1/control';
 
-        // 获取页面上需要更新数据的DOM元素
+        // 获取页面元素
         const tempElement = document.getElementById('temp');
         const humiElement = document.getElementById('humi');
         const luxElement = document.getElementById('lux');
         const soilElement = document.getElementById('soil');
         const timeElement = document.getElementById('update-time');
+        const statusElement = document.getElementById('control-status');
 
-        // 定义一个异步函数来获取并更新数据
+        // 获取传感器数据 (逻辑未改变)
         async function fetchData() {
             try {
-                // 使用fetch API向后端请求数据
-                const response = await fetch(apiUrl);
-                
-                // 检查HTTP响应状态码是否表示成功
-                if (!response.ok) {
-                    throw new Error(`HTTP 错误! 状态: ${response.status}`);
-                }
-
-                // 将响应体解析为JSON格式
+                const response = await fetch(sensorApiUrl);
+                if (!response.ok) throw new Error(`HTTP 错误! 状态: ${response.status}`);
                 const data = await response.json();
-
-                // 更新页面上的数据内容
-                // 使用空值合并操作符(??): 如果data.temperature是null或undefined，就显示'--'
                 tempElement.textContent = data.temperature ?? '--';
                 humiElement.textContent = data.humidity ?? '--';
                 luxElement.textContent = data.lux ? data.lux.toFixed(1) : '--';
                 soilElement.textContent = data.soil ?? '--';
                 timeElement.textContent = data.timestamp ?? 'N/A';
-                
             } catch (error) {
-                // 如果在try块中发生任何错误（网络错误、解析错误等），则执行catch块
                 console.error("获取数据失败:", error);
-                // 在页面上显示错误状态，提供用户反馈
                 tempElement.textContent = '❌';
                 humiElement.textContent = '❌';
                 luxElement.textContent = '❌';
@@ -138,12 +88,36 @@
                 timeElement.textContent = '连接失败';
             }
         }
+        
+        // 新增：发送控制命令的函数
+        async function sendControlCommand(command) {
+            statusElement.textContent = `正在发送命令: ${command}...`;
+            try {
+                const response = await fetch(controlApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: command })
+                });
 
-        // 首次加载页面时，立即调用一次fetchData函数，以便尽快显示数据
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || '未知错误');
+                }
+                
+                statusElement.textContent = `成功: ${result.message}`;
+            } catch (error) {
+                console.error("发送命令失败:", error);
+                statusElement.textContent = `错误: ${error.message}`;
+            }
+        }
+
+        // 绑定按钮事件
+        document.getElementById('led-on-btn').addEventListener('click', () => sendControlCommand('led_on'));
+        document.getElementById('led-off-btn').addEventListener('click', () => sendControlCommand('led_off'));
+        
+        // 首次加载和定时刷新
         fetchData();
-
-        // 使用setInterval设置一个定时器，每隔2000毫秒（2秒）就自动调用一次fetchData函数
-        // 这就实现了数据的实时刷新
         setInterval(fetchData, 2000); 
     </script>
 

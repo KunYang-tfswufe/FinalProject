@@ -12,63 +12,36 @@
         .data-card { font-size: 1.2em; display: flex; align-items: center; justify-content: center; padding: 15px; background-color: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a73e8; flex-wrap: wrap;}
         .data-card span { font-weight: bold; color: #e67e22; min-width: 60px; display: inline-block; text-align: left; padding: 0 10px; }
         #timestamp { margin-top: 30px; font-size: 0.9em; color: #777; }
-
-        /* 新增样式 */
         .controls { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
-        .control-btn {
-            font-size: 1em;
-            padding: 10px 20px;
-            margin: 5px;
-            border: none;
-            border-radius: 5px;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .btn-on { background-color: #28a745; }
-        .btn-on:hover { background-color: #218838; }
-        .btn-off { background-color: #dc3545; }
-        .btn-off:hover { background-color: #c82333; }
+        .control-btn { font-size: 1em; padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; color: white; cursor: pointer; transition: background-color 0.3s; }
+        .btn-on { background-color: #28a745; } .btn-on:hover { background-color: #218838; }
+        .btn-off { background-color: #dc3545; } .btn-off:hover { background-color: #c82333; }
         #control-status { margin-top: 15px; font-style: italic; color: #555; min-height: 1.2em; }
     </style>
 </head>
 <body>
-
     <div class="dashboard">
         <h1>🌱 藏红花培育环境监控与控制</h1>
-        
         <div class="sensors-grid">
             <div class="data-card">🌡️ 温度: <span id="temp">--</span> °C</div>
             <div class="data-card">💧 湿度: <span id="humi">--</span> %</div>
             <div class="data-card">☀️ 光照: <span id="lux">--</span> lux</div>
             <div class="data-card">🌱 土壤: <span id="soil">--</span> %</div>
         </div>
-
-        <!-- 新增的控制区域 -->
         <div class="controls">
             <h2>设备控制</h2>
             <button id="led-on-btn" class="control-btn btn-on">打开指示灯</button>
             <button id="led-off-btn" class="control-btn btn-off">关闭指示灯</button>
             <div id="control-status"></div>
         </div>
-        
         <div id="timestamp">最后更新时间: <span id="update-time">从未</span></div>
     </div>
-
     <script>
-        // API URLS
-        const sensorApiUrl = '/api/v1/sensors/latest';
-        const controlApiUrl = '/api/v1/control';
+        const sensorApiUrl = '/api/v1/sensors/latest', controlApiUrl = '/api/v1/control';
+        const tempElement = document.getElementById('temp'), humiElement = document.getElementById('humi'),
+              luxElement = document.getElementById('lux'), soilElement = document.getElementById('soil'),
+              timeElement = document.getElementById('update-time'), statusElement = document.getElementById('control-status');
 
-        // 获取页面元素
-        const tempElement = document.getElementById('temp');
-        const humiElement = document.getElementById('humi');
-        const luxElement = document.getElementById('lux');
-        const soilElement = document.getElementById('soil');
-        const timeElement = document.getElementById('update-time');
-        const statusElement = document.getElementById('control-status');
-
-        // 获取传感器数据 (逻辑未改变)
         async function fetchData() {
             try {
                 const response = await fetch(sensorApiUrl);
@@ -81,15 +54,12 @@
                 timeElement.textContent = data.timestamp ?? 'N/A';
             } catch (error) {
                 console.error("获取数据失败:", error);
-                tempElement.textContent = '❌';
-                humiElement.textContent = '❌';
-                luxElement.textContent = '❌';
-                soilElement.textContent = '❌';
+                tempElement.textContent = '❌'; humiElement.textContent = '❌';
+                luxElement.textContent = '❌'; soilElement.textContent = '❌';
                 timeElement.textContent = '连接失败';
             }
         }
         
-        // 新增：发送控制命令的函数
         async function sendControlCommand(command) {
             statusElement.textContent = `正在发送命令: ${command}...`;
             try {
@@ -98,13 +68,8 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ command: command })
                 });
-
                 const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.message || '未知错误');
-                }
-                
+                if (!response.ok) throw new Error(result.message || '未知错误');
                 statusElement.textContent = `成功: ${result.message}`;
             } catch (error) {
                 console.error("发送命令失败:", error);
@@ -112,14 +77,12 @@
             }
         }
 
-        // 绑定按钮事件
         document.getElementById('led-on-btn').addEventListener('click', () => sendControlCommand('led_on'));
         document.getElementById('led-off-btn').addEventListener('click', () => sendControlCommand('led_off'));
         
-        // 首次加载和定时刷新
         fetchData();
-        setInterval(fetchData, 2000); 
+        // 修改这里，将刷新频率提高到每秒1次
+        setInterval(fetchData, 1000); 
     </script>
-
 </body>
 </html>

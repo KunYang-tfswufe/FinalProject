@@ -51,6 +51,7 @@
   - **微控制器 (MCU):** **WeAct STM32F411CEU6 "黑药丸"** (WeAct官方旗舰店购买)
   - **开发环境:** **MicroPython v1.26.1** (官方固件)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
+  - **核心控制脚本:Saffron_STM32_Core/deploy_final.sh**
 
 - **请注意开发与测试阶段数据库(开发阶段先使用sqlite,如果有精力在更换为更符合题意的Mysql)和Flask Web服务都先在树莓派4B上,部署与生产阶段将数据库和Flask Web服务器都移植到云服务器**
 - **已安装以下固件MicroPython固件(我购买的黑药丸版本非默认发货板,而是已焊接焊Flash(8MB)+焊排针(向下)-立芯的版本)**

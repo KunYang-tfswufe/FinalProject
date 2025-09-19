@@ -376,16 +376,3 @@ MOS场效应管电子开关控制模块 脉冲触发板 DC直流 带光耦隔离
 1N5819 1A 40V (20个)
 树莓派USB免装驱动摄像头
 
-## 📚 MicroPython官方库生态
-
-**[micropython-lib](https://github.com/micropython/micropython-lib)**: 1000+官方库，即装即用
-
-**快速安装**:
-
-```bash
-mpremote connect /dev/ttyACM0 mip install bme280    # 环境传感器
-mpremote connect /dev/ttyACM0 mip install urequests # HTTP客户端
-mpremote connect /dev/ttyACM0 mip install ssd1306   # OLED显示
-```
-
-**价值**: 传感器驱动50-100倍效率提升，网络通信20-50倍效率提升

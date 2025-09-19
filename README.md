@@ -33,20 +33,6 @@
 密码例如:let*********3(星号为加密部分)
 ```
 
-##
-
-```shell
-# 烧录MicroPython固件到WeAct STM32F411黑药丸
-# 方法1: 使用OpenOCD (推荐)
-cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm32f4x.cfg -c "program WEACT_F411_BLACKPILL-V31_FLASH_8M-20250911-v1.26.1.hex verify reset exit"
-
-# 方法2: 使用STM32CubeProgrammer (备选)
-# STM32CubeProgrammer -c port=SWD -d WEACT_F411_BLACKPILL-V31_FLASH_8M-20250911-v1.26.1.hex -v -rst
-
-# 方法3: 使用mpremote (如果已安装)
-# mpremote connect /dev/ttyACM0 exec "import machine; machine.reset()"
-```
-
 ## 项目核心背景信息 (Project Core Context)
 
 为了方便AI/LLM在后续对话中快速理解上下文，以下是截至当前时间点的项目核心背景信息摘要。
@@ -59,14 +45,12 @@ cd ~/FinalProject/Firmware/ && openocd -f interface/cmsis-dap.cfg -f target/stm3
   - **直接通过SSH连接树莓派4B进行开发,代码全在树莓派上面,Archlinux通过ssh连接树莓派,树莓派通过USB连接STM32F411黑药丸**
   - **嵌入式IDE:** **STM32CubeIDE**
   - **嵌入式调试工具:** **`minicom`** (串口通信测试)
-  - **数据库**: 计划至少 6 张业务表
+  - **数据库**: 计划至少 6 张业务表(开发阶段先使用sqlite,如果有精力在更换为更符合题意的Mysql)
 
 - **硬件选型:**
   - **微控制器 (MCU):** **WeAct STM32F411CEU6 "黑药丸"** (WeAct官方旗舰店购买)
   - **开发环境:** **MicroPython v1.26.1** (官方固件)
   - **边缘计算设备:** **树莓派4B (Raspberry Pi 4B)**
-  - **硬件更换原因:** 原NUCLEO-L476RG开发板损坏，改用WeAct STM32F411黑药丸
-  - **技术优势:** STM32F411性能更强(100MHz vs 84MHz)，支持硬件级DHT读取，开发效率更高
 
 - **请注意开发与测试阶段数据库(开发阶段先使用sqlite,如果有精力在更换为更符合题意的Mysql)和Flask Web服务都先在树莓派4B上,部署与生产阶段将数据库和Flask Web服务器都移植到云服务器**
 - **已安装以下固件MicroPython固件(我购买的黑药丸版本非默认发货板,而是已焊接焊Flash(8MB)+焊排针(向下)-立芯的版本)**

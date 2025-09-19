@@ -9,4 +9,7 @@ Saffron_STM32_Core/Release/
 Saffron_STM32_Core/build/
 project_snapshot.txt
 # Python virtual environment
-.venv
+.venv/
+.direnv/
+.envrc
+venv/

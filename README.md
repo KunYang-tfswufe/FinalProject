@@ -1,1 +1,1 @@
-This is README.md
+.augment/rules/000_PROJECT_CHARTER.md

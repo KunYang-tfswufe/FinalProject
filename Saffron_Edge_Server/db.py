@@ -151,3 +151,53 @@ def insert_control_log(device_id: int, actuator: str | None, action: str | None,
         )
         conn.commit()
 
+
+def query_sensor_history(device_id: int | None = None, start: str | None = None, end: str | None = None,
+                         limit: int = 100, offset: int = 0):
+    """Return a list of rows dicts from sensor_data ordered by id desc.
+    Timestamps use 'YYYY-MM-DD HH:MM:SS' string comparison.
+    """
+    conn = _connect()
+    sql = [
+        'SELECT id, device_id, temperature, humidity, lux, soil, timestamp',
+        'FROM sensor_data WHERE 1=1'
+    ]
+    params: list = []
+    if device_id is not None:
+        sql.append('AND device_id = ?')
+        params.append(device_id)
+    if start:
+        sql.append('AND timestamp >= ?')
+        params.append(start)
+    if end:
+        sql.append('AND timestamp <= ?')
+        params.append(end)
+    sql.append('ORDER BY id DESC')
+    sql.append('LIMIT ? OFFSET ?')
+    params.extend([int(limit), int(offset)])
+    q = ' '.join(sql)
+    with _db_lock:
+        cur = conn.execute(q, tuple(params))
+        rows = [dict(r) for r in cur.fetchall()]
+    return rows
+
+
+def query_control_logs(device_id: int | None = None, limit: int = 100, offset: int = 0):
+    conn = _connect()
+    sql = [
+        'SELECT id, device_id, actuator, action, raw_command, success, created_at',
+        'FROM control_logs WHERE 1=1'
+    ]
+    params: list = []
+    if device_id is not None:
+        sql.append('AND device_id = ?')
+        params.append(device_id)
+    sql.append('ORDER BY id DESC')
+    sql.append('LIMIT ? OFFSET ?')
+    params.extend([int(limit), int(offset)])
+    q = ' '.join(sql)
+    with _db_lock:
+        cur = conn.execute(q, tuple(params))
+        rows = [dict(r) for r in cur.fetchall()]
+    return rows
+

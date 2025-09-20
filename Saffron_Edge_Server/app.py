@@ -140,6 +140,59 @@ def control_device():
         # Service Unavailable
         return jsonify({"status": "error", "message": "Device not connected or busy."}), 503
 
+# --- 历史数据查询 API ---
+@app.route('/api/v1/sensors/history', methods=['GET'])
+def get_sensor_history():
+    def normalize_start_end(s: str | None, e: str | None):
+        def norm_one(x: str | None, is_start: bool):
+            if not x:
+                return None
+            x = x.strip()
+            if len(x) == 10 and x[4] == '-' and x[7] == '-':
+                return x + (' 00:00:00' if is_start else ' 23:59:59')
+            return x
+        return norm_one(s, True), norm_one(e, False)
+
+    start = request.args.get('start')
+    end = request.args.get('end')
+    start, end = normalize_start_end(start, end)
+
+    try:
+        limit = max(1, min(1000, int(request.args.get('limit', '100'))))
+        offset = max(0, int(request.args.get('offset', '0')))
+    except Exception:
+        return jsonify({"error": "invalid limit/offset"}), 400
+
+    device_id = request.args.get('device_id')
+    try:
+        device_id = int(device_id) if device_id is not None else DB_DEVICE_ID
+    except Exception:
+        return jsonify({"error": "invalid device_id"}), 400
+
+    rows = db.query_sensor_history(device_id=device_id, start=start, end=end,
+                                   limit=limit, offset=offset)
+    return jsonify({"items": rows, "count": len(rows)})
+
+
+# --- 控制日志查询 API ---
+@app.route('/api/v1/control/logs', methods=['GET'])
+def get_control_logs():
+    try:
+        limit = max(1, min(1000, int(request.args.get('limit', '100'))))
+        offset = max(0, int(request.args.get('offset', '0')))
+    except Exception:
+        return jsonify({"error": "invalid limit/offset"}), 400
+
+    device_id = request.args.get('device_id')
+    try:
+        device_id = int(device_id) if device_id is not None else DB_DEVICE_ID
+    except Exception:
+        return jsonify({"error": "invalid device_id"}), 400
+
+    rows = db.query_control_logs(device_id=device_id, limit=limit, offset=offset)
+    return jsonify({"items": rows, "count": len(rows)})
+
+
 # --- 程序主入口 (代码未改变) ---
 if __name__ == '__main__':
     reader_thread = threading.Thread(target=serial_reader, daemon=True)

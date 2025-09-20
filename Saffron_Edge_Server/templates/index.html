@@ -22,6 +22,10 @@
 <body>
     <div class="dashboard">
         <h1>🌱 藏红花培育环境监控与控制</h1>
+            <div style="margin: 10px 0 0; text-align:right;">
+                <a href="/history" class="control-btn" style="background-color:#1a73e8; display:inline-block; text-decoration:none;">查看历史数据 ⤴</a>
+            </div>
+
         <div class="sensors-grid">
             <div class="data-card">🌡️ 温度: <span id="temp">--</span> °C</div>
             <div class="data-card">💧 湿度: <span id="humi">--</span> %</div>
@@ -59,7 +63,7 @@
                 timeElement.textContent = '连接失败';
             }
         }
-        
+
         async function sendControlCommand(command) {
             statusElement.textContent = `正在发送命令: ${command}...`;
             try {
@@ -79,10 +83,10 @@
 
         document.getElementById('led-on-btn').addEventListener('click', () => sendControlCommand('led_on'));
         document.getElementById('led-off-btn').addEventListener('click', () => sendControlCommand('led_off'));
-        
+
         fetchData();
         // 修改这里，将刷新频率提高到每秒1次
-        setInterval(fetchData, 1000); 
+        setInterval(fetchData, 1000);
     </script>
 </body>
 </html>

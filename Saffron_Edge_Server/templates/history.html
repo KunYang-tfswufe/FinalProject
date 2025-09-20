@@ -34,6 +34,7 @@
       <label>结束时间 <input id="end" type="datetime-local" /></label>
       <input id="limit" type="number" min="10" max="1000" step="10" value="200" />
       <button id="load">加载</button>
+      <button id="export">导出 CSV</button>
       <span id="status" class="muted">就绪</span>
     </div>
 
@@ -140,6 +141,17 @@
       // el('start').value = toDateTimeLocalString(h1ago);
       // el('end').value = toDateTimeLocalString(now);
     }
+
+    el('export').addEventListener('click', () => {
+      const s = dtLocalToQuery(el('start').value);
+      const e = dtLocalToQuery(el('end').value);
+      const limit = Math.max(10, Math.min(1000, parseInt(el('limit').value || '200')));
+      const qs = new URLSearchParams();
+      if (s) qs.set('start', s);
+      if (e) qs.set('end', e);
+      qs.set('limit', String(limit));
+      window.open('/api/v1/sensors/history.csv?' + qs.toString(), '_blank');
+    });
 
     el('load').addEventListener('click', loadData);
     window.addEventListener('resize', () => { thChart.resize(); lsChart.resize(); });

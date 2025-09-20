@@ -29,7 +29,7 @@ DB_DEVICE_ID = db.ensure_default_device()
 
 # --- 新增：全局共享的串口对象和锁 ---
 # 这个锁将保护对 ser 对象的访问，确保读写操作不会冲突
-serial_lock = threading.Lock() 
+serial_lock = threading.Lock()
 ser = None # 将串口对象设为全局，以便API路由可以访问
 
 # --- 串口读取线程函数 (稍作修改以使用全局 ser) ---
@@ -38,14 +38,14 @@ def serial_reader():
     global latest_data, ser
     serial_port = '/dev/ttyACM0'
     baud_rate = 115200
-    
+
     while True:
         try:
             # 尝试连接，并将连接对象赋给全局变量
             with serial_lock:
                 ser = serial.Serial(serial_port, baud_rate, timeout=2)
             print(f"后台线程: 成功连接到串口 {serial_port}")
-            
+
             while True:
                 line = ser.readline()
                 if line:
@@ -71,7 +71,7 @@ def serial_reader():
                             # 可以在这里打印或记录STM32的响应, e.g., print(f"STM32 Response: {decoded_line}")
                     except (UnicodeDecodeError, json.JSONDecodeError, KeyError):
                         pass # 静默处理不规范的数据行
-        
+
         except serial.SerialException as e:
             print(f"后台线程: 串口错误 - {e}. 5秒后重试...")
         finally:
@@ -88,6 +88,10 @@ CORS(app)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/history')
+def history_page():
+    return render_template('history.html')
 
 @app.route('/api/v1/sensors/latest', methods=['GET'])
 def get_latest_sensor_data():
@@ -194,6 +198,20 @@ def get_control_logs():
 
 
 # --- 程序主入口 (代码未改变) ---
+
+# --- 设备状态查询 API ---
+@app.route('/api/v1/devices/status', methods=['GET'])
+def device_status():
+    device_id = request.args.get('device_id')
+    try:
+        device_id = int(device_id) if device_id is not None else DB_DEVICE_ID
+    except Exception:
+        return jsonify({"error": "invalid device_id"}), 400
+    row = db.query_device_status(device_id)
+    if not row:
+        return jsonify({"error": "device not found"}), 404
+    return jsonify(row)
+
 if __name__ == '__main__':
     reader_thread = threading.Thread(target=serial_reader, daemon=True)
     reader_thread.start()

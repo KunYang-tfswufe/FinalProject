@@ -108,6 +108,16 @@ def create_tables():
             );
             """
         )
+        # Trigger: update devices.last_seen on any control_logs insert
+        conn.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS trg_control_log_update_last_seen
+            AFTER INSERT ON control_logs
+            BEGIN
+                UPDATE devices SET last_seen = datetime('now') WHERE id = NEW.device_id;
+            END;
+            """
+        )
         conn.commit()
 
 
@@ -201,3 +211,23 @@ def query_control_logs(device_id: int | None = None, limit: int = 100, offset: i
         rows = [dict(r) for r in cur.fetchall()]
     return rows
 
+
+
+
+def query_device_status(device_id: int):
+    """Return device info with basic aggregates."""
+    conn = _connect()
+    with _db_lock:
+        row = conn.execute(
+            """
+            SELECT d.id, d.name, d.description, d.last_seen,
+                   (SELECT COUNT(*) FROM sensor_data s
+                      WHERE s.device_id = d.id
+                        AND s.timestamp >= datetime('now','-1 day')) AS count_24h,
+                   (SELECT MAX(timestamp) FROM sensor_data s
+                      WHERE s.device_id = d.id) AS latest_data_ts
+            FROM devices d WHERE d.id = ?
+            """,
+            (device_id,)
+        ).fetchone()
+        return dict(row) if row else None

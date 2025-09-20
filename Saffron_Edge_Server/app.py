@@ -2,8 +2,16 @@ import serial
 import json
 import threading
 import time
+from datetime import datetime
 from flask import Flask, jsonify, render_template, request # 增加 request
 from flask_cors import CORS
+
+# 数据库集成
+try:
+    # Prefer package-style import when available
+    from . import db as db
+except Exception:
+    import db  # fallback when running as a script
 
 # --- 全局变量 ---
 data_lock = threading.Lock()
@@ -14,6 +22,10 @@ latest_data = {
     "soil": None,
     "timestamp": None
 }
+
+# 初始化数据库和默认设备
+db.create_tables()
+DB_DEVICE_ID = db.ensure_default_device()
 
 # --- 新增：全局共享的串口对象和锁 ---
 # 这个锁将保护对 ser 对象的访问，确保读写操作不会冲突
@@ -40,14 +52,21 @@ def serial_reader():
                     try:
                         decoded_line = line.decode('utf-8').strip()
                         # 忽略STM32的响应消息，只处理传感器数据包
-                        if 'temp' in decoded_line: 
+                        if 'temp' in decoded_line:
                             data = json.loads(decoded_line)
+                            ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
                             with data_lock:
                                 latest_data['temperature'] = data.get('temp')
                                 latest_data['humidity'] = data.get('humi')
                                 latest_data['lux'] = data.get('lux')
                                 latest_data['soil'] = data.get('soil')
-                                latest_data['timestamp'] = time.strftime('%Y-%m-%d %H:%M:%S')
+                                latest_data['timestamp'] = ts
+                            # Persist to DB and update last_seen
+                            try:
+                                db.insert_sensor_data(DB_DEVICE_ID, data.get('temp'), data.get('humi'), data.get('lux'), data.get('soil'), ts)
+                                db.update_device_last_seen(DB_DEVICE_ID)
+                            except Exception:
+                                pass
                         # else:
                             # 可以在这里打印或记录STM32的响应, e.g., print(f"STM32 Response: {decoded_line}")
                     except (UnicodeDecodeError, json.JSONDecodeError, KeyError):
@@ -88,6 +107,16 @@ def control_device():
         return jsonify({"status": "error", "message": "Command not provided"}), 400
 
     success = False
+    # 尝试解析结构化命令以便记录日志
+    actuator = None
+    action = None
+    try:
+        parsed = json.loads(command)
+        actuator = parsed.get('actuator')
+        action = parsed.get('action')
+    except Exception:
+        pass
+
     with serial_lock: # 获取串口锁
         if ser and ser.is_open:
             try:
@@ -96,7 +125,15 @@ def control_device():
                 success = True
             except Exception as e:
                 print(f"串口写入错误: {e}")
-                
+
+    # 写入控制日志
+    try:
+        db.insert_control_log(DB_DEVICE_ID, actuator, action, command, success)
+        if success:
+            db.update_device_last_seen(DB_DEVICE_ID)
+    except Exception:
+        pass
+
     if success:
         return jsonify({"status": "success", "message": f"Command '{command}' sent."})
     else:

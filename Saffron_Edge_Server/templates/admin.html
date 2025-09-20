@@ -33,6 +33,8 @@
     </nav>
   </header>
   <main>
+    <div class="muted" id="auth-info" style="margin:8px 0 14px 4px;">登录状态：检测中...</div>
+
     <div class="grid">
       <section class="card">
         <h2>自动灌溉策略</h2>
@@ -43,7 +45,7 @@
           <label>最小间隔(s) <input id="cd" type="number" min="0" max="86400" step="1" style="width:110px"></label>
         </div>
         <div class="row">
-          <label>Admin Token <input id="tok" type="password" placeholder="必填" style="width:160px"></label>
+          <label>Admin Token <input id="tok" type="password" placeholder="可选（或使用登录令牌）" style="width:160px"></label>
           <button id="save">保存策略</button>
           <span id="msg" class="muted"></span>
         </div>
@@ -85,8 +87,13 @@
       const tok = (document.getElementById('tok').value||'').trim();
       const msg = document.getElementById('msg'); msg.textContent='保存中...';
       try{
-        const headers = {'Content-Type':'application/json'}; if (tok) headers['X-Admin-Token']=tok;
-        const r = await fetch('/api/v1/policy/irrigation',{method:'POST', headers, body: JSON.stringify({enabled:enabled, soil_threshold_min:th, watering_seconds:sec, cooldown_seconds:cd})});
+        const headers = {'Content-Type':'application/json'};
+        const t = localStorage.getItem('auth_token'); if (t) headers['Authorization'] = 'Bearer ' + t;
+        if (tok) headers['X-Admin-Token'] = tok;
+        if (!t && !tok) { msg.textContent = '\u8bf7\u5148\u767b\u5f55\u6216\u586b\u5199 Admin Token'; return; }
+        const payload = {enabled:enabled, soil_threshold_min:th, watering_seconds:sec, cooldown_seconds:cd};
+        if (tok) payload.admin_token = tok; // body 也带上，双保险
+        const r = await fetch('/api/v1/policy/irrigation',{method:'POST', headers, body: JSON.stringify(payload)});
         const js = await r.json();
         if(!r.ok) throw new Error(js.error||'保存失败');
         msg.textContent='已保存 ✔';
@@ -101,6 +108,18 @@
         const r = await fetch('/api/v1/control/logs?limit='+limit);
         if(!r.ok) throw new Error('HTTP '+r.status);
         const js = await r.json();
+    async function checkAuth(){
+      const el = document.getElementById('auth-info');
+      const t = localStorage.getItem('auth_token');
+      if(!t){ el.textContent='登录状态：未登录（可前往 /login 登录）'; return; }
+      try{
+        const r = await fetch('/api/v1/auth/me', {headers: {'Authorization': 'Bearer '+t}});
+        if(!r.ok){ el.textContent='登录状态：未登录或令牌失效（请重新登录）'; return; }
+        const js = await r.json();
+        el.textContent = `登录状态：${js.username}（角色：${(js.roles||[]).join(', ')||'无'}）`;
+      }catch(e){ el.textContent='登录状态：检测失败'; }
+    }
+
         const items = js.items || [];
         const tbody = document.getElementById('logs');
         tbody.innerHTML = items.map(it=>`<tr><td>${it.created_at||''}</td><td>${it.actuator||''}</td><td>${it.action||''}</td><td>${it.success?'<span class=ok>是</span>':'<span class=err>否</span>'}</td></tr>`).join('');
@@ -111,6 +130,8 @@
     document.getElementById('save').addEventListener('click', savePolicy);
     document.getElementById('reload').addEventListener('click', loadLogs);
     loadPolicy();
+    checkAuth();
+
     loadLogs();
   </script>
 </body>

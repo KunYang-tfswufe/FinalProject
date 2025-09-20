@@ -7,6 +7,9 @@ from datetime import datetime
 from flask import Flask, jsonify, render_template, request, Response # 增加 request
 from flask_cors import CORS
 import os
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 
 # 数据库集成
@@ -34,6 +37,71 @@ DB_DEVICE_ID = db.ensure_default_device()
 # 这个锁将保护对 ser 对象的访问，确保读写操作不会冲突
 serial_lock = threading.Lock()
 # 简易管理员口令（可通过环境变量 ADMIN_TOKEN 覆盖）
+# 认证配置（无需额外依赖）
+SECRET_KEY = os.environ.get('SECRET_KEY', 'saffron-secret')
+TOKEN_MAX_AGE = int(os.environ.get('TOKEN_MAX_AGE', str(7*24*3600)))  # 默认7天
+serializer = URLSafeTimedSerializer(SECRET_KEY, salt='auth-token')
+REQUIRE_ADMIN_FOR_CONTROL = os.environ.get('REQUIRE_ADMIN_FOR_CONTROL', '0') in ('1','true','TRUE')
+
+
+def _get_bearer_token():
+    auth = request.headers.get('Authorization', '')
+    if auth.startswith('Bearer '):
+        return auth[len('Bearer '):].strip()
+    return None
+
+
+def issue_token(user_id: int) -> str:
+    return serializer.dumps({'uid': int(user_id)})
+
+
+def verify_token(token: str):
+    try:
+        data = serializer.loads(token, max_age=TOKEN_MAX_AGE)
+        return int(data.get('uid'))
+    except (BadSignature, SignatureExpired, Exception):
+        return None
+
+
+def get_current_user():
+    token = _get_bearer_token()
+    if not token:
+        return None
+    uid = verify_token(token)
+    if not uid:
+        return None
+    user = db.get_user_by_id(uid)
+    if not user:
+        return None
+    user['roles'] = db.get_user_roles(uid)
+    return user
+
+
+def auth_required(fn):
+    def wrapper(*args, **kwargs):
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "unauthorized"}), 401
+        request.current_user = user
+        return fn(*args, **kwargs)
+    wrapper.__name__ = fn.__name__
+    return wrapper
+
+
+def admin_required(fn):
+    def wrapper(*args, **kwargs):
+        # 允许使用旧的 X-Admin-Token 兼容
+        provided = request.headers.get('X-Admin-Token')
+        if provided == ADMIN_TOKEN:
+            return fn(*args, **kwargs)
+        user = get_current_user()
+        if not user or ('admin' not in (user.get('roles') or [])):
+            return jsonify({"error": "admin required"}), 403
+        request.current_user = user
+        return fn(*args, **kwargs)
+    wrapper.__name__ = fn.__name__
+    return wrapper
+
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'saffron-admin')
 
 ser = None # 将串口对象设为全局，以便API路由可以访问
@@ -194,6 +262,52 @@ def admin_page():
 def history_page():
     return render_template('history.html')
 
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
+
+
+# --- Auth APIs ---
+@app.route('/api/v1/auth/register', methods=['POST'])
+def register():
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get('username') or '').strip()
+    password = payload.get('password') or ''
+    if not username or not password:
+        return jsonify({"error":"username/password required"}), 400
+    if db.get_user_by_username(username):
+        return jsonify({"error":"username exists"}), 409
+    pwd_hash = generate_password_hash(password)
+    uid = db.create_user(username, pwd_hash)
+    # 首个用户设为 admin
+    try:
+        if db.count_users() == 1:
+            db.assign_role_to_user(uid, 'admin')
+    except Exception:
+        pass
+    token = issue_token(uid)
+    return jsonify({"id": uid, "username": username, "roles": db.get_user_roles(uid), "token": token})
+
+
+@app.route('/api/v1/auth/login', methods=['POST'])
+def login():
+    payload = request.get_json(silent=True) or {}
+    username = (payload.get('username') or '').strip()
+    password = payload.get('password') or ''
+    user = db.get_user_by_username(username)
+    if not user or not check_password_hash(user['password_hash'], password):
+        return jsonify({"error":"invalid credentials"}), 401
+    token = issue_token(user['id'])
+    return jsonify({"token": token, "id": user['id'], "username": user['username'], "roles": db.get_user_roles(user['id'])})
+
+
+@app.route('/api/v1/auth/me', methods=['GET'])
+@auth_required
+def me():
+    u = request.current_user
+    return jsonify({"id": u['id'], "username": u['username'], "roles": u.get('roles', [])})
+
+
 @app.route('/api/v1/sensors/latest', methods=['GET'])
 def get_latest_sensor_data():
     with data_lock:
@@ -203,6 +317,14 @@ def get_latest_sensor_data():
 # --- 新增：控制API端点 ---
 @app.route('/api/v1/control', methods=['POST'])
 def control_device():
+    # 可选保护：仅当启用 REQUIRE_ADMIN_FOR_CONTROL 时要求管理员
+    if REQUIRE_ADMIN_FOR_CONTROL:
+        provided = request.headers.get('X-Admin-Token')
+        user = get_current_user()
+        roles = (user.get('roles') if user else []) or []
+        if not (provided == ADMIN_TOKEN or ('admin' in roles)):
+            return jsonify({"error":"admin required"}), 403
+
     """接收前端的控制命令，并通过串口发送给STM32。"""
     # 从POST请求的JSON体中获取命令
     data = request.get_json()
@@ -296,10 +418,16 @@ def get_irrigation_policy_api():
 def set_irrigation_policy_api():
     payload = request.get_json(silent=True) or {}
 
-    # 简易管理员认证：Header X-Admin-Token 或 JSON/admin_token 或 QueryString
+    # 管理员校验：优先支持 Authorization Bearer（admin 角色），兼容 X-Admin-Token
     provided = request.headers.get('X-Admin-Token') or payload.get('admin_token') or request.args.get('admin_token')
-    if provided != ADMIN_TOKEN:
-        return jsonify({"error": "unauthorized"}), 401
+    is_admin = False
+    user = get_current_user()
+    if user and ('admin' in (user.get('roles') or [])):
+        is_admin = True
+    elif provided == ADMIN_TOKEN:
+        is_admin = True
+    if not is_admin:
+        return jsonify({"error": "admin required"}), 403
 
     enabled = payload.get('enabled')
     soil_threshold_min = payload.get('soil_threshold_min')

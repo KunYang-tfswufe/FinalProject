@@ -314,3 +314,66 @@ def query_control_logs_range(device_id: int | None = None,
     return rows
 
 
+
+
+# --- User & Role helpers ---
+
+def count_users() -> int:
+    conn = _connect()
+    with _db_lock:
+        cur = conn.execute('SELECT COUNT(*) AS c FROM users')
+        r = cur.fetchone()
+        return int(r['c']) if r else 0
+
+
+def get_user_by_username(username: str):
+    conn = _connect()
+    with _db_lock:
+        r = conn.execute('SELECT id, username, password_hash, created_at FROM users WHERE username=?', (username,)).fetchone()
+        return dict(r) if r else None
+
+
+def get_user_by_id(user_id: int):
+    conn = _connect()
+    with _db_lock:
+        r = conn.execute('SELECT id, username, password_hash, created_at FROM users WHERE id=?', (int(user_id),)).fetchone()
+        return dict(r) if r else None
+
+
+def create_user(username: str, password_hash: str) -> int:
+    conn = _connect()
+    with _db_lock:
+        conn.execute('INSERT INTO users(username, password_hash) VALUES(?, ?)', (username, password_hash))
+        conn.commit()
+        r = conn.execute('SELECT id FROM users WHERE username=?', (username,)).fetchone()
+        return int(r['id'])
+
+
+def ensure_role(name: str) -> int:
+    conn = _connect()
+    with _db_lock:
+        r = conn.execute('SELECT id FROM roles WHERE name=?', (name,)).fetchone()
+        if r:
+            return int(r['id'])
+        conn.execute('INSERT INTO roles(name) VALUES(?)', (name,))
+        conn.commit()
+        r = conn.execute('SELECT id FROM roles WHERE name=?', (name,)).fetchone()
+        return int(r['id'])
+
+
+def assign_role_to_user(user_id: int, role_name: str):
+    role_id = ensure_role(role_name)
+    conn = _connect()
+    with _db_lock:
+        conn.execute('INSERT OR IGNORE INTO user_roles(user_id, role_id) VALUES(?, ?)', (int(user_id), int(role_id)))
+        conn.commit()
+
+
+def get_user_roles(user_id: int) -> list[str]:
+    conn = _connect()
+    with _db_lock:
+        cur = conn.execute(
+            'SELECT r.name FROM roles r JOIN user_roles ur ON ur.role_id=r.id WHERE ur.user_id=?',
+            (int(user_id),)
+        )
+        return [row['name'] for row in cur.fetchall()]

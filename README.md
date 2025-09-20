@@ -1,1 +1,0 @@
-.augment/rules/architecture.md

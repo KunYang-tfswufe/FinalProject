@@ -268,6 +268,18 @@ def get_sensor_history():
     except Exception:
         return jsonify({"error": "invalid limit/offset"}), 400
 
+    # parse device_id and query
+    device_id = request.args.get('device_id')
+    try:
+        device_id = int(device_id) if device_id is not None else DB_DEVICE_ID
+    except Exception:
+        return jsonify({"error": "invalid device_id"}), 400
+
+    rows = db.query_sensor_history(device_id=device_id, start=start, end=end,
+                                   limit=limit, offset=offset)
+    return jsonify({"items": rows, "count": len(rows)})
+
+
 # --- 灌溉策略 API ---
 @app.route('/api/v1/policy/irrigation', methods=['GET'])
 def get_irrigation_policy_api():

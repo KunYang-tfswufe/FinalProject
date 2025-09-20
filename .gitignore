@@ -13,3 +13,12 @@ project_snapshot.txt
 .direnv/
 .envrc
 venv/
+
+
+# SQLite database files (binary) -- do not commit local data
+# Specific project database
+Saffron_Edge_Server/data.sqlite3
+Saffron_Edge_Server/data.sqlite3-wal
+Saffron_Edge_Server/data.sqlite3-shm
+# Generic pattern (future db files)
+*.sqlite3

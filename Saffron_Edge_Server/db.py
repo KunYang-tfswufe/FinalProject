@@ -231,3 +231,40 @@ def query_device_status(device_id: int):
             (device_id,)
         ).fetchone()
         return dict(row) if row else None
+
+
+
+# --- Irrigation policy helpers ---
+
+def get_irrigation_policy(device_id: int):
+    conn = _connect()
+    with _db_lock:
+        row = conn.execute(
+            """
+            SELECT id, device_id, enabled, soil_threshold_min, watering_seconds, updated_at
+            FROM irrigation_policies
+            WHERE device_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (device_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def upsert_irrigation_policy(device_id: int, enabled: int, soil_threshold_min: float | None, watering_seconds: int | None):
+    conn = _connect()
+    with _db_lock:
+        cur = conn.execute('SELECT id FROM irrigation_policies WHERE device_id=? ORDER BY id DESC LIMIT 1', (device_id,))
+        row = cur.fetchone()
+        if row:
+            conn.execute(
+                'UPDATE irrigation_policies SET enabled=?, soil_threshold_min=?, watering_seconds=?, updated_at=datetime(\'now\') WHERE id=?',
+                (int(enabled), soil_threshold_min, watering_seconds, row['id'])
+            )
+        else:
+            conn.execute(
+                'INSERT INTO irrigation_policies(device_id, enabled, soil_threshold_min, watering_seconds) VALUES (?, ?, ?, ?)',
+                (device_id, int(enabled), soil_threshold_min, watering_seconds)
+            )
+        conn.commit()

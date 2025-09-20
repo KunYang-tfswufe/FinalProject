@@ -33,6 +33,13 @@ DB_DEVICE_ID = db.ensure_default_device()
 serial_lock = threading.Lock()
 ser = None # 将串口对象设为全局，以便API路由可以访问
 
+
+# --- 自动灌溉状态（内存） ---
+auto_irrigation_state = {
+    "watering": False,
+    "last_start_ts": None
+}
+
 # --- 串口读取线程函数 (稍作修改以使用全局 ser) ---
 def serial_reader():
     """后台线程，负责读取串口数据并更新 latest_data。"""
@@ -75,12 +82,79 @@ def serial_reader():
 
         except serial.SerialException as e:
             print(f"后台线程: 串口错误 - {e}. 5秒后重试...")
-        finally:
-            with serial_lock:
-                if ser and ser.is_open:
-                    ser.close()
-                ser = None # 断开连接后，重置全局变量
-            time.sleep(5)
+
+# --- 自动灌溉后台线程 ---
+
+def irrigation_worker():
+    """后台线程：根据 irrigation_policies 自动控制水泵开/关。
+    策略：若 enabled 且 soil < soil_threshold_min，则打开水泵 watering_seconds 秒后关闭。
+    """
+    global ser
+    POLL_INTERVAL = 5  # 秒
+    while True:
+        try:
+            policy = db.get_irrigation_policy(DB_DEVICE_ID)
+            if not policy or not policy.get('enabled'):
+                time.sleep(POLL_INTERVAL)
+                continue
+
+            threshold = policy.get('soil_threshold_min')
+            duration = policy.get('watering_seconds')
+            if threshold is None or duration is None or duration <= 0:
+                time.sleep(POLL_INTERVAL)
+                continue
+
+            # 读取当前土壤湿度
+            with data_lock:
+                soil = latest_data.get('soil')
+            if soil is None:
+                time.sleep(POLL_INTERVAL)
+                continue
+
+            # 若满足条件且当前未在浇水
+            if soil < threshold and not auto_irrigation_state["watering"]:
+                # 发送开泵指令
+                cmd_on = json.dumps({"actuator": "pump", "action": "on"})
+                success_on = False
+                with serial_lock:
+                    if ser and ser.is_open:
+                        try:
+                            ser.write((cmd_on + "\n").encode('utf-8'))
+                            success_on = True
+                        except Exception:
+                            success_on = False
+                # 记录日志
+                try:
+                    db.insert_control_log(DB_DEVICE_ID, "pump", "on", cmd_on, success_on)
+                except Exception:
+                    pass
+
+                if success_on:
+                    auto_irrigation_state["watering"] = True
+                    auto_irrigation_state["last_start_ts"] = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+                    # 持续浇水指定秒数
+                    time.sleep(int(duration))
+                    # 发送关泵指令
+                    cmd_off = json.dumps({"actuator": "pump", "action": "off"})
+                    success_off = False
+                    with serial_lock:
+                        if ser and ser.is_open:
+                            try:
+                                ser.write((cmd_off + "\n").encode('utf-8'))
+                                success_off = True
+                            except Exception:
+                                success_off = False
+                    try:
+                        db.insert_control_log(DB_DEVICE_ID, "pump", "off", cmd_off, success_off)
+                    except Exception:
+                        pass
+                    auto_irrigation_state["watering"] = False
+
+            time.sleep(POLL_INTERVAL)
+        except Exception:
+            # 任意异常，避免线程崩溃
+            time.sleep(POLL_INTERVAL)
+
 
 # --- Flask Web应用 ---
 app = Flask(__name__)
@@ -168,15 +242,58 @@ def get_sensor_history():
     except Exception:
         return jsonify({"error": "invalid limit/offset"}), 400
 
+# --- 灌溉策略 API ---
+@app.route('/api/v1/policy/irrigation', methods=['GET'])
+def get_irrigation_policy_api():
     device_id = request.args.get('device_id')
     try:
         device_id = int(device_id) if device_id is not None else DB_DEVICE_ID
     except Exception:
         return jsonify({"error": "invalid device_id"}), 400
+    row = db.get_irrigation_policy(device_id)
+    return jsonify(row or {})
 
-    rows = db.query_sensor_history(device_id=device_id, start=start, end=end,
-                                   limit=limit, offset=offset)
-    return jsonify({"items": rows, "count": len(rows)})
+
+@app.route('/api/v1/policy/irrigation', methods=['POST'])
+def set_irrigation_policy_api():
+    payload = request.get_json(silent=True) or {}
+    enabled = payload.get('enabled')
+    soil_threshold_min = payload.get('soil_threshold_min')
+    watering_seconds = payload.get('watering_seconds')
+
+    # basic validation
+    if enabled in (True, False):
+        enabled_int = 1 if enabled else 0
+    elif isinstance(enabled, int) and enabled in (0,1):
+        enabled_int = enabled
+    else:
+        return jsonify({"error": "enabled must be boolean"}), 400
+
+    try:
+        soil_v = float(soil_threshold_min) if soil_threshold_min is not None else None
+        dur_v = int(watering_seconds) if watering_seconds is not None else None
+    except Exception:
+        return jsonify({"error": "invalid soil_threshold_min or watering_seconds"}), 400
+
+    device_id = payload.get('device_id')
+    try:
+        device_id = int(device_id) if device_id is not None else DB_DEVICE_ID
+    except Exception:
+        return jsonify({"error": "invalid device_id"}), 400
+
+    db.upsert_irrigation_policy(device_id, enabled_int, soil_v, dur_v)
+    row = db.get_irrigation_policy(device_id)
+    return jsonify(row or {}), 200
+
+
+@app.route('/api/v1/policy/irrigation/status', methods=['GET'])
+def get_auto_irrigation_status():
+    return jsonify({
+        "watering": auto_irrigation_state["watering"],
+        "last_start_ts": auto_irrigation_state["last_start_ts"]
+    })
+
+
 
 # --- 历史数据 CSV 导出 API ---
 @app.route('/api/v1/sensors/history.csv', methods=['GET'])
@@ -260,5 +377,9 @@ def device_status():
 if __name__ == '__main__':
     reader_thread = threading.Thread(target=serial_reader, daemon=True)
     reader_thread.start()
+
+    irrigation_thread = threading.Thread(target=irrigation_worker, daemon=True)
+    irrigation_thread.start()
+
     print("启动统一服务器... 请在浏览器中访问 http://<你的树莓派IP>:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)

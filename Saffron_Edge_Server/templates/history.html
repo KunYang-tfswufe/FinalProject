@@ -112,9 +112,41 @@
           ]
         });
 
+        // 叠加灌溉事件区间
+        let intervals = [];
+        try {
+          const logQs = new URLSearchParams();
+          if (s) logQs.set('start', s);
+          if (e) logQs.set('end', e);
+          logQs.set('actuator', 'pump');
+          logQs.set('limit', '500');
+          const logsResp = await fetch('/api/v1/control/logs?' + logQs.toString());
+          if (logsResp.ok) {
+            const logsJson = await logsResp.json();
+            const logs = (logsJson.items || []).slice().reverse(); // 时间升序
+            let currentStart = null;
+            for (const it of logs) {
+              if (it.action === 'on' && !currentStart) {
+                currentStart = it.created_at || it.timestamp || it.time || it.createdAt || it.ts;
+              } else if (it.action === 'off' && currentStart) {
+                const endTs = it.created_at || it.timestamp || it.time || it.createdAt || it.ts;
+                if (currentStart && endTs) {
+                  intervals.push([
+                    { xAxis: currentStart },
+                    { xAxis: endTs }
+                  ]);
+                }
+                currentStart = null;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('加载灌溉日志失败', err);
+        }
+
         lsChart.setOption({
           tooltip: { trigger: 'axis' },
-          legend: { data: ['光照(lux)','土壤(%)'] },
+          legend: { data: ['光照(lux)','土壤(%)','灌溉区间'] },
           xAxis: { type: 'category', data: xs },
           yAxis: [
             { type: 'value', name: '光照(lux)' },
@@ -122,7 +154,12 @@
           ],
           series: [
             { name: '光照(lux)', type: 'line', data: lux, smooth: true },
-            { name: '土壤(%)', type: 'line', yAxisIndex: 1, data: soil, smooth: true }
+            { name: '土壤(%)', type: 'line', yAxisIndex: 1, data: soil, smooth: true,
+              markArea: intervals.length ? {
+                itemStyle: { color: 'rgba(40,167,69,0.12)' },
+                data: intervals
+              } : undefined
+            }
           ]
         });
 

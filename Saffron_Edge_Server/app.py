@@ -6,6 +6,8 @@ import io, csv
 from datetime import datetime
 from flask import Flask, jsonify, render_template, request, Response # 增加 request
 from flask_cors import CORS
+import os
+
 
 # 数据库集成
 try:
@@ -31,13 +33,17 @@ DB_DEVICE_ID = db.ensure_default_device()
 # --- 新增：全局共享的串口对象和锁 ---
 # 这个锁将保护对 ser 对象的访问，确保读写操作不会冲突
 serial_lock = threading.Lock()
+# 简易管理员口令（可通过环境变量 ADMIN_TOKEN 覆盖）
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'saffron-admin')
+
 ser = None # 将串口对象设为全局，以便API路由可以访问
 
 
 # --- 自动灌溉状态（内存） ---
 auto_irrigation_state = {
     "watering": False,
-    "last_start_ts": None
+    "last_start_ts": None,
+    "last_end_ts": None
 }
 
 # --- 串口读取线程函数 (稍作修改以使用全局 ser) ---
@@ -100,9 +106,23 @@ def irrigation_worker():
 
             threshold = policy.get('soil_threshold_min')
             duration = policy.get('watering_seconds')
+            cooldown = policy.get('cooldown_seconds') or 0
             if threshold is None or duration is None or duration <= 0:
                 time.sleep(POLL_INTERVAL)
                 continue
+            # Respect cooldown since last end
+            try:
+                cd = int(cooldown)
+            except Exception:
+                cd = 0
+            if cd > 0 and auto_irrigation_state.get("last_end_ts"):
+                try:
+                    last_end = datetime.strptime(auto_irrigation_state["last_end_ts"], '%Y-%m-%d %H:%M:%S')
+                    if (datetime.utcnow() - last_end).total_seconds() < cd:
+                        time.sleep(POLL_INTERVAL)
+                        continue
+                except Exception:
+                    pass
 
             # 读取当前土壤湿度
             with data_lock:
@@ -148,6 +168,8 @@ def irrigation_worker():
                         db.insert_control_log(DB_DEVICE_ID, "pump", "off", cmd_off, success_off)
                     except Exception:
                         pass
+                    if success_off:
+                        auto_irrigation_state["last_end_ts"] = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
                     auto_irrigation_state["watering"] = False
 
             time.sleep(POLL_INTERVAL)
@@ -163,6 +185,10 @@ CORS(app)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/admin')
+def admin_page():
+    return render_template('admin.html')
 
 @app.route('/history')
 def history_page():
@@ -257,14 +283,21 @@ def get_irrigation_policy_api():
 @app.route('/api/v1/policy/irrigation', methods=['POST'])
 def set_irrigation_policy_api():
     payload = request.get_json(silent=True) or {}
+
+    # 简易管理员认证：Header X-Admin-Token 或 JSON/admin_token 或 QueryString
+    provided = request.headers.get('X-Admin-Token') or payload.get('admin_token') or request.args.get('admin_token')
+    if provided != ADMIN_TOKEN:
+        return jsonify({"error": "unauthorized"}), 401
+
     enabled = payload.get('enabled')
     soil_threshold_min = payload.get('soil_threshold_min')
     watering_seconds = payload.get('watering_seconds')
+    cooldown_seconds = payload.get('cooldown_seconds')
 
     # basic validation
     if enabled in (True, False):
         enabled_int = 1 if enabled else 0
-    elif isinstance(enabled, int) and enabled in (0,1):
+    elif isinstance(enabled, int) and enabled in (0, 1):
         enabled_int = enabled
     else:
         return jsonify({"error": "enabled must be boolean"}), 400
@@ -272,8 +305,9 @@ def set_irrigation_policy_api():
     try:
         soil_v = float(soil_threshold_min) if soil_threshold_min is not None else None
         dur_v = int(watering_seconds) if watering_seconds is not None else None
+        cd_v = int(cooldown_seconds) if cooldown_seconds is not None else None
     except Exception:
-        return jsonify({"error": "invalid soil_threshold_min or watering_seconds"}), 400
+        return jsonify({"error": "invalid soil_threshold_min/watering_seconds/cooldown_seconds"}), 400
 
     device_id = payload.get('device_id')
     try:
@@ -281,7 +315,7 @@ def set_irrigation_policy_api():
     except Exception:
         return jsonify({"error": "invalid device_id"}), 400
 
-    db.upsert_irrigation_policy(device_id, enabled_int, soil_v, dur_v)
+    db.upsert_irrigation_policy(device_id, enabled_int, soil_v, dur_v, cd_v)
     row = db.get_irrigation_policy(device_id)
     return jsonify(row or {}), 200
 
@@ -290,7 +324,8 @@ def set_irrigation_policy_api():
 def get_auto_irrigation_status():
     return jsonify({
         "watering": auto_irrigation_state["watering"],
-        "last_start_ts": auto_irrigation_state["last_start_ts"]
+        "last_start_ts": auto_irrigation_state["last_start_ts"],
+        "last_end_ts": auto_irrigation_state["last_end_ts"]
     })
 
 
@@ -355,7 +390,23 @@ def get_control_logs():
     except Exception:
         return jsonify({"error": "invalid device_id"}), 400
 
-    rows = db.query_control_logs(device_id=device_id, limit=limit, offset=offset)
+    # optional filters
+    actuator = request.args.get('actuator')
+    start = request.args.get('start')
+    end = request.args.get('end')
+    # allow YYYY-MM-DD shortcuts
+    def norm(ts, is_start):
+        if not ts:
+            return None
+        ts = ts.strip()
+        if len(ts) == 10 and ts[4] == '-' and ts[7] == '-':
+            return ts + (' 00:00:00' if is_start else ' 23:59:59')
+        return ts
+    start = norm(start, True)
+    end = norm(end, False)
+
+    rows = db.query_control_logs_range(device_id=device_id, start=start, end=end,
+                                       actuator=actuator, limit=limit, offset=offset)
     return jsonify({"items": rows, "count": len(rows)})
 
 

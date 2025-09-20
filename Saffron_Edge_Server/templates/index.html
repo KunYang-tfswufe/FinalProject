@@ -24,6 +24,8 @@
         <h1>🌱 藏红花培育环境监控与控制</h1>
             <div style="margin: 10px 0 0; text-align:right;">
                 <a href="/history" class="control-btn" style="background-color:#1a73e8; display:inline-block; text-decoration:none;">查看历史数据 ⤴</a>
+                <a href="/admin" class="control-btn" style="background-color:#6f42c1; display:inline-block; text-decoration:none;">后台管理 ⤴</a>
+
             </div>
 
         <div class="sensors-grid">
@@ -36,8 +38,25 @@
             <h2>设备控制</h2>
             <button id="led-on-btn" class="control-btn btn-on">打开指示灯</button>
             <button id="led-off-btn" class="control-btn btn-off">关闭指示灯</button>
+            <button id="pump-on-btn" class="control-btn btn-on">开启水泵</button>
+            <button id="pump-off-btn" class="control-btn btn-off">关闭水泵</button>
             <div id="control-status"></div>
         </div>
+            <div class="controls">
+                <h2>自动灌溉策略</h2>
+                    <label>最小间隔(s) <input type="number" id="policy-cooldown" min="0" max="86400" step="1" style="width:100px;"></label>
+                    <label>Admin Token <input type="password" id="admin-token" placeholder="可选" style="width:140px;"></label>
+
+                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center;">
+                    <label><input type="checkbox" id="policy-enabled"> 启用自动灌溉</label>
+                    <label>土壤阈值(%) <input type="number" id="policy-threshold" min="0" max="100" step="0.1" style="width:90px;"></label>
+                    <label>浇水时长(s) <input type="number" id="policy-seconds" min="1" max="3600" step="1" style="width:90px;"></label>
+                    <button id="policy-save" class="control-btn" style="background-color:#1a73e8;">保存策略</button>
+                </div>
+                <div id="policy-msg" style="margin-top:8px; color:#555;"></div>
+                <div style="margin-top:8px;">当前自动灌溉状态: <span id="policy-status">未知</span></div>
+            </div>
+
         <div id="timestamp">最后更新时间: <span id="update-time">从未</span></div>
     </div>
     <script>
@@ -80,8 +99,74 @@
                 statusElement.textContent = `错误: ${error.message}`;
             }
         }
+        // --- Auto Irrigation Policy UI Logic ---
+        const policyGetUrl = '/api/v1/policy/irrigation';
+        const policyPostUrl = '/api/v1/policy/irrigation';
+        const policyStatusUrl = '/api/v1/policy/irrigation/status';
+
+        async function loadPolicy() {
+            try {
+                const r = await fetch(policyGetUrl);
+                const p = await r.json();
+                const en = !!(p && (p.enabled === 1 || p.enabled === true));
+                const th = p && p.soil_threshold_min != null ? p.soil_threshold_min : '';
+                const sec = p && p.watering_seconds != null ? p.watering_seconds : '';
+                const cd = p && p.cooldown_seconds != null ? p.cooldown_seconds : '';
+                document.getElementById('policy-enabled').checked = en;
+                document.getElementById('policy-threshold').value = th;
+                document.getElementById('policy-seconds').value = sec;
+                document.getElementById('policy-cooldown').value = cd;
+            } catch (e) {
+                document.getElementById('policy-msg').textContent = '无法加载策略';
+            }
+        }
+
+        async function savePolicy() {
+            const enabled = document.getElementById('policy-enabled').checked;
+            const soil = parseFloat(document.getElementById('policy-threshold').value);
+            const secs = parseInt(document.getElementById('policy-seconds').value, 10);
+            const cd = parseInt(document.getElementById('policy-cooldown').value, 10);
+            const token = (document.getElementById('admin-token').value || '').trim();
+            const msg = document.getElementById('policy-msg');
+            msg.textContent = '正在保存...';
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (token) headers['X-Admin-Token'] = token;
+                const r = await fetch(policyPostUrl, {
+                    method: 'POST', headers,
+                    body: JSON.stringify({ enabled: enabled, soil_threshold_min: soil, watering_seconds: secs, cooldown_seconds: cd })
+                });
+                const res = await r.json();
+                if (!r.ok) throw new Error(res.error || '保存失败');
+                msg.textContent = '已保存 ✔';
+                loadPolicy();
+            } catch (e) {
+                msg.textContent = '错误: ' + e.message;
+            }
+        }
+
+        async function refreshPolicyStatus() {
+            try {
+                const r = await fetch(policyStatusUrl);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const s = await r.json();
+                document.getElementById('policy-status').textContent = s.watering ? ('浇水中，开始于 ' + (s.last_start_ts || '')) : ('空闲，上次结束于 ' + (s.last_end_ts || '未知'));
+            } catch (e) {
+
+                document.getElementById('policy-status').textContent = '状态不可用';
+            }
+        }
+
+        document.getElementById('policy-save')?.addEventListener('click', savePolicy);
+        loadPolicy();
+        refreshPolicyStatus();
+        setInterval(refreshPolicyStatus, 3000);
+
 
         document.getElementById('led-on-btn').addEventListener('click', () => sendControlCommand('led_on'));
+        document.getElementById('pump-on-btn').addEventListener('click', () => sendControlCommand(JSON.stringify({actuator:'pump', action:'on'})));
+        document.getElementById('pump-off-btn').addEventListener('click', () => sendControlCommand(JSON.stringify({actuator:'pump', action:'off'})));
+
         document.getElementById('led-off-btn').addEventListener('click', () => sendControlCommand('led_off'));
 
         fetchData();

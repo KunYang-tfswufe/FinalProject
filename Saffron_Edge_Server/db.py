@@ -108,6 +108,12 @@ def create_tables():
             );
             """
         )
+        # Migration: ensure cooldown_seconds column exists
+        try:
+            conn.execute("ALTER TABLE irrigation_policies ADD COLUMN cooldown_seconds INTEGER")
+        except Exception:
+            pass
+
         # Trigger: update devices.last_seen on any control_logs insert
         conn.execute(
             """
@@ -233,7 +239,6 @@ def query_device_status(device_id: int):
         return dict(row) if row else None
 
 
-
 # --- Irrigation policy helpers ---
 
 def get_irrigation_policy(device_id: int):
@@ -241,7 +246,7 @@ def get_irrigation_policy(device_id: int):
     with _db_lock:
         row = conn.execute(
             """
-            SELECT id, device_id, enabled, soil_threshold_min, watering_seconds, updated_at
+            SELECT id, device_id, enabled, soil_threshold_min, watering_seconds, cooldown_seconds, updated_at
             FROM irrigation_policies
             WHERE device_id = ?
             ORDER BY id DESC
@@ -252,19 +257,60 @@ def get_irrigation_policy(device_id: int):
         return dict(row) if row else None
 
 
-def upsert_irrigation_policy(device_id: int, enabled: int, soil_threshold_min: float | None, watering_seconds: int | None):
+def upsert_irrigation_policy(device_id: int, enabled: int,
+                              soil_threshold_min: float | None,
+                              watering_seconds: int | None,
+                              cooldown_seconds: int | None):
     conn = _connect()
     with _db_lock:
         cur = conn.execute('SELECT id FROM irrigation_policies WHERE device_id=? ORDER BY id DESC LIMIT 1', (device_id,))
         row = cur.fetchone()
         if row:
             conn.execute(
-                'UPDATE irrigation_policies SET enabled=?, soil_threshold_min=?, watering_seconds=?, updated_at=datetime(\'now\') WHERE id=?',
-                (int(enabled), soil_threshold_min, watering_seconds, row['id'])
+                "UPDATE irrigation_policies SET enabled=?, soil_threshold_min=?, watering_seconds=?, cooldown_seconds=?, updated_at=datetime('now') WHERE id=?",
+                (int(enabled), soil_threshold_min, watering_seconds, cooldown_seconds, row['id'])
             )
         else:
             conn.execute(
-                'INSERT INTO irrigation_policies(device_id, enabled, soil_threshold_min, watering_seconds) VALUES (?, ?, ?, ?)',
-                (device_id, int(enabled), soil_threshold_min, watering_seconds)
+                'INSERT INTO irrigation_policies(device_id, enabled, soil_threshold_min, watering_seconds, cooldown_seconds) VALUES (?, ?, ?, ?, ?)',
+                (device_id, int(enabled), soil_threshold_min, watering_seconds, cooldown_seconds)
             )
         conn.commit()
+
+
+# --- Control logs range query (for overlays) ---
+
+def query_control_logs_range(device_id: int | None = None,
+                             start: str | None = None,
+                             end: str | None = None,
+                             actuator: str | None = None,
+                             limit: int = 100,
+                             offset: int = 0):
+    conn = _connect()
+    sql = [
+        'SELECT id, device_id, actuator, action, raw_command, success, created_at',
+        'FROM control_logs WHERE 1=1'
+    ]
+    params: list = []
+    if device_id is not None:
+        sql.append('AND device_id = ?')
+        params.append(device_id)
+    if start:
+        sql.append('AND created_at >= ?')
+        params.append(start)
+    if end:
+        sql.append('AND created_at <= ?')
+        params.append(end)
+    if actuator:
+        sql.append('AND actuator = ?')
+        params.append(actuator)
+    sql.append('ORDER BY id DESC')
+    sql.append('LIMIT ? OFFSET ?')
+    params.extend([int(limit), int(offset)])
+    q = ' '.join(sql)
+    with _db_lock:
+        cur = conn.execute(q, tuple(params))
+        rows = [dict(r) for r in cur.fetchall()]
+    return rows
+
+

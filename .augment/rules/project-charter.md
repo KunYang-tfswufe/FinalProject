@@ -1,1 +1,0 @@
-/home/pi/FinalProject/.windsurf/rules/project-charter.md

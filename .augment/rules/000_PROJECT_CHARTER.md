@@ -229,3 +229,67 @@ type: "always_apply"
 ```python
 ["面包板(MB-102)x2和配套的面包板电源x2","树莓派4B","电阻一大把,杜邦线一大堆,面包板一个,LED一堆,几个逻辑芯片,一些杂七杂八的小玩意例如电容,按钮等.","esp-12F model esp8266MOD CH340 Driver","HW-028","HW-139","HW-072","HW-61","HW-478","HW-095","DHT11","MH-FMD Low level trigger","Tracker Sensor","Relay model TONGLING 5VDC 10A 250VAC 15A 125VAC 10A 220VAC JQC-3FF-S-Z 1路光耦隔离继电器驱动模块支持高/低电平触发","HW-389 NodeMcu Ver 1.0","LCD9648 普中科技 www.prechin.cn","MH-Sensor-series","MH_Electronic","MH-Real-Time Clock modules","Water Sensor","MQ Sensor Flying Fish MQ-2","RFID-RC522","HC-SR04","HW-103 v0.1","5011AS","5161BS","马达x3(有不同的样子)和风扇","还要个类似马达的东西:STEP MOTOR 28BYJ-48 5V DC 2405005728","9V电池两个","Grayscale Sensor","Tower Pro Micro Servo 9g SG90","ULN2003 步进电机驱动板","电位器","土壤湿度检测(REMOVE SEAL AFTER WASHING)","Hall Effect Sensor Module","Passive Infrared Sensor","WS2812B RGB LED","声音传感器模块","激光二极管模块","蓝牙模块","蜂鸣器","TCRT5000 反射式光电传感器","ESP-01 wifi","倾斜传感器模块","紫色,红色,绿色的假花","26cm _ 19cm _ 14cm的亚克力箱子(带盖)","12cm _ 12cm _ 12cm的亚克力花盆","迷你打孔机","一个塑料瓶子(当作物的水库)","塑料逆止阀","LED灯带5V","带线防水探头DS18B20测温检测","电容式土壤湿度传感器模块","GY-302 数字光强度 光照传感器","MOS场效应管电子开关控制模块 脉冲触发板 DC直流 带光耦隔离","1N5819 1A 40V (20个)","树莓派USB免装驱动摄像头"]
 ```
+```mermaid
+graph TD
+    subgraph "设备端 (Device Layer)"
+        direction LR
+        S_DHT[("🌡️ DHT11<br>温湿度")]
+        S_BH[("☀️ BH1750<br>光照")]
+        S_SOIL[("💧 土壤湿度")]
+        STM32("💻 **STM32F411 (MicroPython)**<br><br>
+             - 非阻塞主循环 (select.poll)<br>
+             - 传感器智能驱动 (降级策略)<br>
+             - JSON 数据格式化<br>
+             - 串口命令解析")
+        A_LED[("💡 状态指示灯")]
+        A_PUMP[("💦 5V 水泵")]
+        S_DHT --> STM32
+        S_BH --> STM32
+        S_SOIL --> STM32
+        STM32 --> A_LED
+        STM32 --> A_PUMP
+    end
+    subgraph "边缘端 (Edge Layer - Raspberry Pi 4B)"
+        RPI("**树莓派 4B (Python 环境)**")
+        subgraph "Flask 应用 (`app.py`)"
+            API["
+                🚀 **REST API 端点**<br>
+                /api/sensors/latest<br>
+                /api/sensors/history<br>
+                /api/control<br>
+                /api/policy/irrigation<br>
+                /api/auth/*
+            "]
+            WEB_UI["🌐 Web 界面服务<br>(templates/*.html)"]
+        end
+        subgraph "后台服务 (Threads)"
+            SERIAL_T["📡 **串口读取线程**<br>- 监听 /dev/ttyACM0<br>- 解析 JSON<br>- 更新实时数据<br>- 存入数据库"]
+            IRRIGATION_T["🌿 **自动灌溉线程**<br>- 读取策略和数据<br>- 决策并发送指令"]
+        end
+        DB("🗃️ **SQLite 数据库 (db.py)**<br><br>
+            - **sensor_data**: 历史数据<br>
+            - **control_logs**: 操作日志<br>
+            - **irrigation_policies**: 灌溉策略<br>
+            - **users/roles**: 用户权限<br>
+            - ... (共7张表 + 触发器)
+            ")
+        SERIAL_T --> |"1. 更新实时状态"| API
+        SERIAL_T --> |"2. 持久化存储"| DB
+        API -.-> |"4. 控制指令"| STM32
+        IRRIGATION_T --> |"读取策略"| DB
+        IRRIGATION_T --> |"读取实时土壤湿度"| SERIAL_T
+        IRRIGATION_T --> |"5. 自动控制指令"| STM32
+        API --> DB
+    end
+    subgraph "用户/云端 (User/Cloud Layer)"
+        USER_DEVICE("📱 **用户设备 (PC/手机)**<br>
+            - Web 浏览器")
+        MQTT_BROKER("☁️ **MQTT Broker (未来扩展)**<br>
+            - 实现云端通信<br>
+            - 支持移动App")
+    end
+    STM32 -- "<b>USB 虚拟串口 (VCP)</b><br>持续发送 JSON 数据流" --> SERIAL_T
+    USER_DEVICE <--> |"<b>HTTP/HTTPS 请求</b><br>- 获取实时/历史数据<br>- 发送控制/策略命令"| API
+    USER_DEVICE <--> |"<b></b>"| WEB_UI
+    linkStyle 14 stroke-width:2px,fill:none,stroke:orange,stroke-dasharray: 5 5;
+```

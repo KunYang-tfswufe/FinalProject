@@ -171,13 +171,13 @@ type: "always_apply"
   - [ ] **数据上报:** 在主程序的后台线程中，除了存数据库外，还将每条传感器数据 publish 到一个 Topic (e.g., `saffron/device1/data`)。
   - [ ] **指令下发:** 让 MQTT 客户端 subscribe 一个控制 Topic (e.g., `saffron/device1/control/set`)。在 `on_message` 回调中，解析收到的云端指令，并写入串口。
   - [ ] **[验证] MQTTX 测试:** 使用 MQTT 客户端工具 (如 MQTTX) 订阅数据 Topic，确认能收到树莓派发来的数据；再向控制 Topic 发布指令，确认 STM32 有响应。
-  - [ ] **视觉告警上报（可选）:** 运行一个简易摄像头采集/图片处理脚本（OpenCV 或阈值法），对明显异常进行判别并通过 Topic（如 `saffron/device1/vision/alerts`）上报；同步写入 `vision_alerts`。
+  - [ ] **视觉告警上报:** 运行一个简易树莓派摄像头Camera 3 Modules采集/图片处理脚本（OpenCV 或阈值法），对明显异常进行判别并通过 Topic（如 `saffron/device1/vision/alerts`）上报；同步写入 `vision_alerts`。
 
 - #### **任务 3.4: 原生前端完善与 PWA**
   - [ ] **登录/登出:** 创建 `templates/login.html`，实现登录/登出，使用 `localStorage` 存储 JWT。
   - [ ] **访问控制:** 采用多页面（`login.html` / `dashboard.html` / `history.html` / `admin.html`）；在页面脚本中检测 JWT，未登录跳转登录页。
   - [ ] **后台管理页:** 新增 `templates/admin.html`，原生表格展示用户列表与角色信息（管理员权限）。
-  - [ ] **策略与视觉（可选 UI）:** 在 `dashboard.html` 添加自动灌溉策略的开/关与阈值设置控件；添加视觉告警提示区域与最近告警列表。
+  - [ ] **策略与视觉:** 在 `dashboard.html` 添加自动灌溉策略的开/关与阈值设置控件；添加视觉告警提示区域与最近告警列表。
   - [ ] **响应式设计:** 使用 CSS Flex/Grid + 媒体查询，适配移动端与桌面端。
   - [ ] **PWA 配置:** 增加 `manifest.json` 与 `service-worker.js`，缓存关键静态资源与接口降级策略。
   - [ ] **[验证] 多设备测试:** 在 PC/手机浏览器访问应用，检查登录、权限、离线缓存与安装体验。
@@ -199,7 +199,6 @@ type: "always_apply"
     - _示例2 (异常):_ STM32 意外断电，前端应显示设备离线或数据不再更新。
     - _示例3 (异常):_ 树莓派断网，测试 MQTT 重连机制是否生效。
   - [ ] **执行测试:** 逐一执行测试用例，记录结果，对发现的 Bug 进行修复。
-  - [ ] **压力测试 (可选):** 编写脚本快速向 API 发送请求，观察系统资源占用情况。
 
 - #### **任务 4.2: 生产环境部署**
   - [ ] **安装部署软件:** 在树莓派上安装 `gunicorn` 和 `nginx`。

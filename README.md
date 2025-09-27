@@ -1,1 +1,0 @@
-.augment/rules/000_PROJECT_CHARTER.md

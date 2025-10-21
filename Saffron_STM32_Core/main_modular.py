@@ -1,4 +1,4 @@
-# 藏红花培育系统主程序 - 模块化版本 v7.2 (非阻塞优化)
+# 藏红花培育系统主程序 - 模块化版本 v7.4 (修正继电器逻辑)
 # 实现即时命令响应和定时传感器读取
 
 import machine
@@ -33,13 +33,14 @@ try:
 except ImportError as e:
     print(f"❌ 关键驱动模块导入失败: {e}"); sys.exit()
 
-print("\n=== 藏红花培育系统 v7.2 - 高响应非阻塞模式 ===")
+print("\n=== 藏红花培育系统 v7.4 - 高响应非阻塞模式 ===")
 
-# --- 硬件初始化 (代码未改变) ---
+# --- 硬件初始化 ---
 status_led = machine.Pin('C13', machine.Pin.OUT, value=1)
 dht11 = None
 light_sensor = None
 soil_adc = None
+pump_relay = None # 初始化水泵变量
 
 try: dht11 = create_dht11_sensor(machine.Pin('A1', machine.Pin.IN, machine.Pin.PULL_UP), 'DHT11')
 except Exception as e: print(f"❌ DHT11 初始化失败: {e}")
@@ -52,9 +53,44 @@ except Exception as e: print(f"❌ 光照传感器初始化失败: {e}")
 try: soil_adc = machine.ADC(machine.Pin('A2'))
 except Exception as e: print(f"❌ 土壤湿度传感器初始化失败: {e}")
 
-# --- 命令处理器 (代码未改变) ---
+# --- 修正：初始化水泵继电器引脚 (B10) 为高电平触发逻辑 ---
+try:
+    # 对于高电平触发模块：
+    # 初始值 value=0 (低电平) 意味着继电器初始状态是“关闭”的。
+    pump_relay = machine.Pin('B10', machine.Pin.OUT, value=0)
+    print("✅ 水泵继电器引脚 (B10) 初始化成功 (高电平触发模式)")
+except Exception as e:
+    print(f"❌ 水泵继电器初始化失败: {e}")
+    # 即使失败，程序也继续运行，只是水泵功能不可用
+
+# --- 命令处理器 (修正为高电平触发逻辑) ---
 def process_command(cmd):
     cmd = cmd.strip()
+    
+    # 优先尝试解析JSON格式的命令
+    try:
+        data = json.loads(cmd)
+        actuator = data.get('actuator')
+        action = data.get('action')
+
+        if actuator == 'pump' and pump_relay:
+            if action == 'on':
+                pump_relay.high() # 高电平触发，打开继电器
+                print('{"response": "Pump is ON"}')
+            elif action == 'off':
+                pump_relay.low() # 低电平，关闭继电器
+                print('{"response": "Pump is OFF"}')
+            else:
+                print('{"error": "Unknown pump action"}')
+        else:
+            print('{"error": "Unknown or unavailable actuator"}')
+        return # JSON命令处理完毕，直接返回
+        
+    except (ValueError, KeyError):
+        # 如果JSON解析失败，则回退到处理简单的字符串命令 (保持向后兼容)
+        pass
+
+    # --- 兼容旧的简单命令 ---
     if cmd == "led_on":
         status_led.low()
         print('{"response": "LED is ON"}')
@@ -62,28 +98,28 @@ def process_command(cmd):
         status_led.high()
         print('{"response": "LED is OFF"}')
     else:
-        print('{"error": "Unknown command"}')
+        # 对于无法解析的非JSON命令
+        print(f'{{"error": "Unknown or invalid command: {cmd}"}}')
 
-# --- 主循环 (核心修改) ---
+# --- 主循环 (核心代码未改变) ---
 print("\n🚀 开始非阻塞数据采集与命令监听循环...")
 print("-" * 50)
 cycle_count = 0
 
-# --- 新增：任务调度相关的变量 ---
-# 定义传感器读取的时间间隔 (单位：毫秒)
-# 这个值决定了数据上报的频率，可以自由调整
-SENSOR_READ_INTERVAL = 1000  # <<-- 这里从3秒缩短到1秒
+# --- 任务调度相关的变量 ---
+SENSOR_READ_INTERVAL = 1000  # 1秒读取一次传感器
 last_sensor_read_time = time.ticks_ms()
 
 poll_obj = select.poll()
 poll_obj.register(sys.stdin, select.POLLIN)
 
-# --- 主循环现在将尽可能快地运行 ---
+# --- 主循环 ---
 while True:
     # 任务1: 检查并处理控制指令 (每次循环都做，所以响应极快)
     if poll_obj.poll(0):
         command = sys.stdin.readline()
-        process_command(command)
+        if command: # 确保读取到内容
+            process_command(command)
 
     # 任务2: 检查是否到了读取传感器的时间
     current_time = time.ticks_ms()
@@ -119,6 +155,5 @@ while True:
         json_string = json.dumps(data_packet)
         print(json_string)
         
-    # 不再有大的 time.sleep()。循环会快速重复，让系统保持“清醒”
-    # 可以加一个非常小的延时，防止CPU 100% 占用，但通常不是必须的
-    # time.sleep_ms(10)
+    # 不再有大的 time.sleep()
+    # time.sleep_ms(10) # 可以加一个非常小的延时，防止CPU 100% 占用

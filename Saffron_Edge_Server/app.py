@@ -1,4 +1,4 @@
-# Saffron_Edge_Server/app.py
+# Saffron_Edge_Server/app.py (优化版 v2)
 
 import serial
 import json
@@ -12,14 +12,18 @@ import os
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# --- 新增：导入摄像头库 ---
+# --- 修改点 1：将摄像头相关代码移到全局 ---
+PI_CAMERA_AVAILABLE = False
+picam2 = None # 全局摄像头对象
 try:
     from picamera2 import Picamera2
+    # 仅创建实例，不在这里启动
+    picam2 = Picamera2()
     PI_CAMERA_AVAILABLE = True
-except ImportError:
-    print("⚠️ 警告: picamera2 库未找到，拍照功能将不可用。")
-    PI_CAMERA_AVAILABLE = False
-# --- 结束新增 ---
+    print("✅ picamera2 库加载成功，摄像头对象已创建。")
+except Exception as e:
+    print(f"⚠️ 警告: picamera2 初始化失败: {e}。拍照功能将不可用。")
+# --- 结束修改 ---
 
 
 # 数据库集成
@@ -28,46 +32,29 @@ try:
 except Exception:
     import db
 
-# --- 全局变量 ---
+# --- 全局变量 (未改变) ---
 data_lock = threading.Lock()
-latest_data = {
-    "temperature": None,
-    "humidity": None,
-    "lux": None,
-    "soil": None,
-    "timestamp": None
-}
-
+latest_data = { "temperature": None, "humidity": None, "lux": None, "soil": None, "timestamp": None }
 db.create_tables()
 DB_DEVICE_ID = db.ensure_default_device()
-
 serial_lock = threading.Lock()
 SECRET_KEY = os.environ.get('SECRET_KEY', 'saffron-secret')
 TOKEN_MAX_AGE = int(os.environ.get('TOKEN_MAX_AGE', str(7*24*3600)))
 serializer = URLSafeTimedSerializer(SECRET_KEY, salt='auth-token')
 REQUIRE_ADMIN_FOR_CONTROL = os.environ.get('REQUIRE_ADMIN_FOR_CONTROL', '0') in ('1','true','TRUE')
-
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'saffron-admin')
 ser = None
+auto_irrigation_state = { "watering": False, "last_start_ts": None, "last_end_ts": None }
 
-auto_irrigation_state = {
-    "watering": False,
-    "last_start_ts": None,
-    "last_end_ts": None
-}
-
-# --- 摄像头相关配置 ---
+# 摄像头照片保存目录
 CAPTURES_DIR = os.path.join(os.path.dirname(__file__), 'static', 'captures')
 if not os.path.exists(CAPTURES_DIR):
     os.makedirs(CAPTURES_DIR)
-# --- 结束 ---
-
 
 # --- 原有的函数 (此处省略未修改的代码以保持简洁) ---
 def _get_bearer_token():
     auth = request.headers.get('Authorization', '')
-    if auth.startswith('Bearer '):
-        return auth[len('Bearer '):].strip()
+    if auth.startswith('Bearer '): return auth[len('Bearer '):].strip()
     return None
 def issue_token(user_id: int) -> str: return serializer.dumps({'uid': int(user_id)})
 def verify_token(token: str):
@@ -141,35 +128,30 @@ def irrigation_worker():
         try:
             policy = db.get_irrigation_policy(DB_DEVICE_ID)
             if not policy or not policy.get('enabled'):
-                time.sleep(POLL_INTERVAL)
-                continue
+                time.sleep(POLL_INTERVAL); continue
             threshold = policy.get('soil_threshold_min')
             duration = policy.get('watering_seconds')
             cooldown = policy.get('cooldown_seconds') or 0
             if threshold is None or duration is None or duration <= 0:
-                time.sleep(POLL_INTERVAL)
-                continue
+                time.sleep(POLL_INTERVAL); continue
             try: cd = int(cooldown)
             except Exception: cd = 0
             if cd > 0 and auto_irrigation_state.get("last_end_ts"):
                 try:
                     last_end = datetime.strptime(auto_irrigation_state["last_end_ts"], '%Y-%m-%d %H:%M:%S')
                     if (datetime.utcnow() - last_end).total_seconds() < cd:
-                        time.sleep(POLL_INTERVAL)
-                        continue
+                        time.sleep(POLL_INTERVAL); continue
                 except Exception: pass
             with data_lock: soil = latest_data.get('soil')
             if soil is None:
-                time.sleep(POLL_INTERVAL)
-                continue
+                time.sleep(POLL_INTERVAL); continue
             if soil < threshold and not auto_irrigation_state["watering"]:
                 cmd_on = json.dumps({"actuator": "pump", "action": "on"})
                 success_on = False
                 with serial_lock:
                     if ser and ser.is_open:
                         try:
-                            ser.write((cmd_on + "\n").encode('utf-8'))
-                            success_on = True
+                            ser.write((cmd_on + "\n").encode('utf-8')); success_on = True
                         except Exception: success_on = False
                 try: db.insert_control_log(DB_DEVICE_ID, "pump", "on", cmd_on, success_on)
                 except Exception: pass
@@ -182,8 +164,7 @@ def irrigation_worker():
                     with serial_lock:
                         if ser and ser.is_open:
                             try:
-                                ser.write((cmd_off + "\n").encode('utf-8'))
-                                success_off = True
+                                ser.write((cmd_off + "\n").encode('utf-8')); success_off = True
                             except Exception: success_off = False
                     try: db.insert_control_log(DB_DEVICE_ID, "pump", "off", cmd_off, success_off)
                     except Exception: pass
@@ -193,19 +174,83 @@ def irrigation_worker():
         except Exception: time.sleep(POLL_INTERVAL)
 # --- 结束省略 ---
 
-# --- Flask Web应用 ---
 app = Flask(__name__)
 CORS(app)
 
-# --- 路由 (此处省略未修改的路由以保持简洁) ---
+# --- 路由 (此处省略大部分未修改的路由) ---
 @app.route('/')
 def index(): return render_template('index.html')
+# ... 其他页面路由 ...
 @app.route('/admin')
 def admin_page(): return render_template('admin.html')
 @app.route('/history')
 def history_page(): return render_template('history.html')
 @app.route('/login')
 def login_page(): return render_template('login.html')
+
+# --- 修改点 2：简化拍照API端点 ---
+@app.route('/api/v1/camera/capture', methods=['POST'])
+def capture_photo():
+    """处理拍照请求，使用全局摄像头对象。"""
+    if not PI_CAMERA_AVAILABLE or not picam2:
+        return jsonify({"status": "error", "message": "摄像头模块不可用或未初始化。"}), 503
+
+    try:
+        # 1. 定义文件名和路径
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"saffron_{timestamp}.jpg"
+        filepath = os.path.join(CAPTURES_DIR, filename)
+        
+        # 2. 直接拍照并保存 (不再需要 start/stop)
+        picam2.capture_file(filepath)
+        print(f"照片已保存至: {filepath}")
+        
+        # 3. 返回成功响应
+        relative_path = os.path.join('static', 'captures', filename)
+        return jsonify({
+            "status": "success", 
+            "message": f"照片拍摄成功！",
+            "path": relative_path
+        })
+            
+    except Exception as e:
+        print(f"❌ 拍照失败: {e}")
+        return jsonify({"status": "error", "message": f"拍照失败: {e}"}), 500
+# --- 结束修改 ---
+
+# --- 其他未修改的 API 路由 (省略) ---
+@app.route('/api/v1/control', methods=['POST'])
+def control_device():
+    # ... 省略 ...
+    if REQUIRE_ADMIN_FOR_CONTROL:
+        provided = request.headers.get('X-Admin-Token')
+        user = get_current_user()
+        roles = (user.get('roles') if user else []) or []
+        if not (provided == ADMIN_TOKEN or ('admin' in roles)): return jsonify({"error":"admin required"}), 403
+    data = request.get_json()
+    command = data.get('command')
+    if not command: return jsonify({"status": "error", "message": "Command not provided"}), 400
+    success = False
+    actuator = None
+    action = None
+    try:
+        parsed = json.loads(command)
+        actuator = parsed.get('actuator')
+        action = parsed.get('action')
+    except Exception: pass
+    with serial_lock:
+        if ser and ser.is_open:
+            try:
+                ser.write((command + '\n').encode('utf-8'))
+                success = True
+            except Exception as e: print(f"串口写入错误: {e}")
+    try:
+        db.insert_control_log(DB_DEVICE_ID, actuator, action, command, success)
+        if success: db.update_device_last_seen(DB_DEVICE_ID)
+    except Exception: pass
+    if success: return jsonify({"status": "success", "message": f"Command '{command}' sent."})
+    else: return jsonify({"status": "error", "message": "Device not connected or busy."}), 503
+# ... 省略其他API路由 ...
 @app.route('/api/v1/auth/register', methods=['POST'])
 def register():
     payload = request.get_json(silent=True) or {}
@@ -238,81 +283,6 @@ def me():
 def get_latest_sensor_data():
     with data_lock: data_to_return = latest_data.copy()
     return jsonify(data_to_return)
-# --- 结束省略 ---
-
-@app.route('/api/v1/control', methods=['POST'])
-def control_device():
-    if REQUIRE_ADMIN_FOR_CONTROL:
-        provided = request.headers.get('X-Admin-Token')
-        user = get_current_user()
-        roles = (user.get('roles') if user else []) or []
-        if not (provided == ADMIN_TOKEN or ('admin' in roles)): return jsonify({"error":"admin required"}), 403
-    data = request.get_json()
-    command = data.get('command')
-    if not command: return jsonify({"status": "error", "message": "Command not provided"}), 400
-    success = False
-    actuator = None
-    action = None
-    try:
-        parsed = json.loads(command)
-        actuator = parsed.get('actuator')
-        action = parsed.get('action')
-    except Exception: pass
-    with serial_lock:
-        if ser and ser.is_open:
-            try:
-                ser.write((command + '\n').encode('utf-8'))
-                success = True
-            except Exception as e: print(f"串口写入错误: {e}")
-    try:
-        db.insert_control_log(DB_DEVICE_ID, actuator, action, command, success)
-        if success: db.update_device_last_seen(DB_DEVICE_ID)
-    except Exception: pass
-    if success: return jsonify({"status": "success", "message": f"Command '{command}' sent."})
-    else: return jsonify({"status": "error", "message": "Device not connected or busy."}), 503
-
-# --- 新增：拍照API端点 ---
-@app.route('/api/v1/camera/capture', methods=['POST'])
-def capture_photo():
-    """处理拍照请求，保存照片并返回路径。"""
-    if not PI_CAMERA_AVAILABLE:
-        return jsonify({"status": "error", "message": "摄像头模块不可用。"}), 503
-
-    try:
-        # 1. 初始化摄像头
-        picam2 = Picamera2()
-        
-        # 2. 启动摄像头并等待稳定
-        picam2.start()
-        time.sleep(2)
-        
-        # 3. 定义文件名和路径
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"saffron_{timestamp}.jpg"
-        filepath = os.path.join(CAPTURES_DIR, filename)
-        
-        # 4. 拍照并保存
-        picam2.capture_file(filepath)
-        print(f"照片已保存至: {filepath}")
-        
-        # 5. 停止摄像头
-        picam2.stop()
-        
-        # 6. 返回成功响应
-        # 返回的是相对 static 目录的路径，方便前端直接使用
-        relative_path = os.path.join('static', 'captures', filename)
-        return jsonify({
-            "status": "success", 
-            "message": f"照片拍摄成功！",
-            "path": relative_path
-        })
-            
-    except Exception as e:
-        print(f"❌ 拍照失败: {e}")
-        return jsonify({"status": "error", "message": f"拍照失败: {e}"}), 500
-# --- 结束新增 ---
-
-# --- 路由 (此处省略未修改的路由以保持简洁) ---
 @app.route('/api/v1/sensors/history', methods=['GET'])
 def get_sensor_history():
     def normalize_start_end(s: str | None, e: str | None):
@@ -410,10 +380,23 @@ def device_status():
     row = db.query_device_status(device_id)
     if not row: return jsonify({"error": "device not found"}), 404
     return jsonify(row)
-# --- 结束省略 ---
 
 
 if __name__ == '__main__':
+    # --- 修改点 3：在主程序启动时，真正启动摄像头 ---
+    if PI_CAMERA_AVAILABLE and picam2:
+        try:
+            # 这里的 still_config 只是一个例子，你可以根据需要配置
+            # 对于简单拍照，默认配置通常就足够了
+            still_config = picam2.create_still_configuration()
+            picam2.configure(still_config)
+            picam2.start()
+            print("✅ 摄像头已成功启动并准备就绪。")
+        except Exception as e:
+            print(f"❌ 启动摄像头失败: {e}")
+            PI_CAMERA_AVAILABLE = False # 如果启动失败，就标记为不可用
+    # --- 结束修改 ---
+
     reader_thread = threading.Thread(target=serial_reader, daemon=True)
     reader_thread.start()
 

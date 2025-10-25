@@ -46,9 +46,10 @@ more-itertools==8.10.0
 mpremote==1.26.1
 mypy==1.0.1
 mypy-extensions==0.4.3
-numpy==2.3.4
+numpy==1.26.4
 oauthlib==3.2.2
 olefile==0.46
+opencv-python-headless==4.9.0.80
 packaging==25.0
 parso==0.8.3
 pexpect==4.8.0
@@ -102,6 +103,7 @@ smbus2==0.4.2
 soupsieve==2.3.2
 spidev==3.5
 ssh-import-id==5.10
+tflite-runtime==2.14.0
 thonny==4.1.4
 toml==0.10.2
 tomlkit==0.11.7

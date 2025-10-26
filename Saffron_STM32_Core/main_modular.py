@@ -1,7 +1,5 @@
-# 藏红花培育系统主程序 - v9.4 (全新手势选择器控制)
-# - 移除"挥手"手势, 使用更可靠的手势组合
-# - 在控制页引入">"选择器，可控制水泵、灯带、状态灯
-# - 向前/向后: 移动选择器 | 向上/向下: 开关选中设备
+# 藏红花培育系统主程序 - v9.8 (标题极简最终版)
+# - 将所有页面标题简化为4个字符，从根本上解决重叠问题
 
 import machine
 import time
@@ -35,7 +33,7 @@ try:
 except ImportError as e:
     print(f"❌ 关键驱动模块导入失败: {e}"); sys.exit()
 
-print("\n=== 藏红花培育系统 v9.4 - 全新交互版 ===")
+print("\n=== 藏红花培育系统 v9.8 - 标题极简版 ===")
 
 # --- 全局状态管理 ---
 SCREEN_WIDTH = 128
@@ -43,7 +41,6 @@ SCREEN_HEIGHT = 64
 I2C_ADDRESS = 0x3C
 current_display_page = 0
 NUM_PAGES = 3
-# 新增：控制页面的选择器状态 (0:水泵, 1:灯带, 2:状态灯)
 control_page_selection = 0
 NUM_CONTROL_ITEMS = 3 
 
@@ -84,63 +81,55 @@ try:
     print("✅ LED灯带继电器(B12)初始化成功")
 except Exception as e: print(f"❌ LED灯带继电器初始化失败: {e}")
 
-# --- OLED 显示屏更新函数 (全新控制页) ---
+# --- OLED 显示屏更新函数 (标题极简版) ---
 def update_display(data, page_num):
     if not display: return
     display.fill(0)
+    
     page_indicator = f"[{page_num + 1}/{NUM_PAGES}]"
+    indicator_x = 128 - len(page_indicator) * 8 - 2
 
-    # --- 页面 1: 主监控页 ---
+    # --- 标题行 ---
+    title = " "
+    if page_num == 0: title = "MAIN"
+    elif page_num == 1: title = "CTRL"
+    elif page_num == 2: title = "INFO"
+    display.text(title, 4, 0)
+    display.text(page_indicator, indicator_x, 0)
+    display.text("----------------", 0, 9)
+
+    # --- 内容行 ---
     if page_num == 0:
-        display.text("Saffron Monitor", 4, 0)
-        display.text("----------------", 0, 9)
-        temp_str = f"T:{data.get('temp', '--')}C"
-        humi_str = f"H:{data.get('humi', '--')}%"
-        lux_str  = f"L:{data.get('lux', '--')}"
-        soil_str = f"S:{data.get('soil', '--')}%"
-        display.text(temp_str, 0, 19)
-        display.text(humi_str, 64, 19)
-        display.text(lux_str, 0, 35)
-        display.text(soil_str, 64, 35)
-        gesture_text = f"G:{data.get('gesture', '--')}"
-        display.text(gesture_text, 0, 55)
+        temp_str = f"T:{data.get('temp', '--')}C"; humi_str = f"H:{data.get('humi', '--')}%"
+        lux_str  = f"L:{data.get('lux', '--')}"; soil_str = f"S:{data.get('soil', '--')}%"
+        display.text(temp_str, 0, 19); display.text(humi_str, 64, 19)
+        display.text(lux_str, 0, 35);  display.text(soil_str, 64, 35)
+        display.text(f"Gesture: {data.get('gesture', '--')}", 0, 55)
 
-    # --- 页面 2: 设备控制页 (带选择器) ---
     elif page_num == 1:
-        display.text("Device Control", 4, 0)
-        display.text("----------------", 0, 9)
-        
-        # 获取各设备状态
         pump_state = "ON" if pump_relay and pump_relay.value() else "OFF"
         led_strip_state = "ON" if led_strip_relay and led_strip_relay.value() else "OFF"
-        # 状态灯是低电平点亮，逻辑相反
         status_led_state = "ON" if status_led and not status_led.value() else "OFF"
         
-        # 根据选择器状态加前缀 ">"
-        pump_line = f"{'>' if control_page_selection == 0 else ' '} Water Pump : {pump_state}"
-        led_strip_line = f"{'>' if control_page_selection == 1 else ' '} LED Strip  : {led_strip_state}"
-        status_led_line = f"{'>' if control_page_selection == 2 else ' '} Status LED : {status_led_state}"
+        pump_line = f"{'>' if control_page_selection == 0 else ' '} Pump  : {pump_state}"
+        led_strip_line = f"{'>' if control_page_selection == 1 else ' '} Strip : {led_strip_state}"
+        status_led_line = f"{'>' if control_page_selection == 2 else ' '} LED   : {status_led_state}"
         
         display.text(pump_line, 0, 18)
         display.text(led_strip_line, 0, 31)
         display.text(status_led_line, 0, 44)
-        
-        display.text("Fwd/Bwd:Sel|Up/Dn:Tgl", 0, 55)
+        display.text("F/B:Move U/D:On", 0, 55)
 
-    # --- 页面 3: 系统信息页 ---
     elif page_num == 2:
-        display.text("System Info", 4, 0)
-        display.text("----------------", 0, 9)
         driver_mode = dht11.driver_mode if dht11 else "N/A"
-        display.text(f"DHT Driver:{driver_mode}", 0, 20)
-        display.text(f"Cycle Count:{data.get('cycle', 0)}", 0, 34)
+        display.text(f"DHT: {driver_mode}", 0, 20)
+        display.text(f"Loop: {data.get('cycle', 0)}", 0, 34)
         py_ver = f"{sys.version_info[0]}.{sys.version_info[1]}"
-        display.text(f"MicroPython: v{py_ver}", 0, 48)
+        display.text(f"uPy: v{py_ver}", 0, 48)
 
-    display.text(page_indicator, 128 - len(page_indicator) * 8 - 2, 55)
     display.show()
 
-# 命令处理器 (未修改)
+# 命令处理器
 def process_command(cmd):
     cmd = cmd.strip()
     try:
@@ -161,7 +150,7 @@ def process_command(cmd):
         else: print(f'{{"error": "Unknown command: {cmd}"}}')
 
 # --- 主循环 ---
-print("\n🚀 开始主循环 (全新手势交互)...")
+print("\n🚀 开始主循环 (标题极简版)...")
 print("-" * 50)
 cycle_count = 0; last_sensor_read_time = time.ticks_ms();
 poll_obj = select.poll(); poll_obj.register(sys.stdin, select.POLLIN)
@@ -176,37 +165,19 @@ while True:
         try:
             gesture_name = paj_sensor.get_gesture_name(paj_sensor.get_gesture_code())
             if gesture_name:
-                last_valid_gesture = gesture_name
-                gesture_display_timer = current_time
-                last_gesture_process_time = current_time
+                last_valid_gesture = gesture_name; gesture_display_timer = current_time; last_gesture_process_time = current_time
                 needs_display_update = False
-
-                if gesture_name == "向右":
-                    current_display_page = (current_display_page + 1) % NUM_PAGES
-                    needs_display_update = True
-                elif gesture_name == "向左":
-                    current_display_page = (current_display_page - 1 + NUM_PAGES) % NUM_PAGES
-                    needs_display_update = True
-                
-                # --- 全新的控制页手势逻辑 ---
+                if gesture_name == "向右": current_display_page = (current_display_page + 1) % NUM_PAGES; needs_display_update = True
+                elif gesture_name == "向左": current_display_page = (current_display_page - 1 + NUM_PAGES) % NUM_PAGES; needs_display_update = True
                 elif current_display_page == 1:
-                    if gesture_name == "向前":
-                        control_page_selection = (control_page_selection + 1) % NUM_CONTROL_ITEMS
-                        needs_display_update = True
-                    elif gesture_name == "向后":
-                        control_page_selection = (control_page_selection - 1 + NUM_CONTROL_ITEMS) % NUM_CONTROL_ITEMS
-                        needs_display_update = True
+                    if gesture_name == "向前": control_page_selection = (control_page_selection + 1) % NUM_CONTROL_ITEMS
+                    elif gesture_name == "向后": control_page_selection = (control_page_selection - 1 + NUM_CONTROL_ITEMS) % NUM_CONTROL_ITEMS
                     elif gesture_name in ("向上", "向下"):
-                        if control_page_selection == 0 and pump_relay:
-                            pump_relay.value(not pump_relay.value())
-                        elif control_page_selection == 1 and led_strip_relay:
-                            led_strip_relay.value(not led_strip_relay.value())
-                        elif control_page_selection == 2 and status_led:
-                            status_led.value(not status_led.value())
-                        needs_display_update = True
-
-                if needs_display_update:
-                    update_display(current_data_packet, current_display_page)
+                        if control_page_selection == 0 and pump_relay: pump_relay.value(not pump_relay.value())
+                        elif control_page_selection == 1 and led_strip_relay: led_strip_relay.value(not led_strip_relay.value())
+                        elif control_page_selection == 2 and status_led: status_led.value(not status_led.value())
+                    needs_display_update = True
+                if needs_display_update: update_display(current_data_packet, current_display_page)
         except Exception: pass
 
     if poll_obj.poll(0):
@@ -225,9 +196,7 @@ while True:
                        
         if dht11 and dht11.measure():
             sensor_data = dht11.get_data()
-            if sensor_data.get('is_valid'):
-                current_data_packet['temp'] = sensor_data.get('temperature')
-                current_data_packet['humi'] = sensor_data.get('humidity')
+            if sensor_data.get('is_valid'): current_data_packet.update({'temp': sensor_data.get('temperature'), 'humi': sensor_data.get('humidity')})
         if light_sensor: current_data_packet['lux'] = round(light_sensor.read_lux(), 1) if light_sensor.read_lux() is not None else None
         if soil_adc:
             try:

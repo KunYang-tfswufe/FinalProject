@@ -1,7 +1,6 @@
 from picamera2 import Picamera2
 import time
 
-
 # 初始化摄像头
 picam2 = Picamera2()
 

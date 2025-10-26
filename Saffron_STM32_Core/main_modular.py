@@ -1,5 +1,5 @@
-# 藏红花培育系统主程序 - v8.0 (集成OLED显示屏)
-# 在原有功能基础上，增加OLED实时数据显示
+# 藏红花培育系统主程序 - v9.0 (集成PAJ7620手势识别)
+# 在原有功能基础上，增加手势识别，并显示在OLED和Web界面
 
 import machine
 import time
@@ -8,10 +8,11 @@ import sys
 import select
 
 # --- 导入驱动模块 ---
-# 新增: 导入OLED驱动
+# 新增: 导入PAJ7620驱动
 try:
     from drivers import create_dht11_sensor, get_driver_info
     import ssd1306 
+    from paj7620 import PAJ7620
     
     # BH1750驱动类保持不变
     class BH1750:
@@ -33,7 +34,7 @@ try:
 except ImportError as e:
     print(f"❌ 关键驱动模块导入失败: {e}"); sys.exit()
 
-print("\n=== 藏红花培育系统 v8.0 - OLED集成版 ===")
+print("\n=== 藏红花培育系统 v9.0 - 手势识别集成版 ===")
 
 # --- 硬件与OLED配置 ---
 SCREEN_WIDTH = 128
@@ -42,7 +43,7 @@ I2C_ADDRESS = 0x3C
 
 # --- 硬件初始化 ---
 status_led = machine.Pin('C13', machine.Pin.OUT, value=1)
-dht11, light_sensor, soil_adc = None, None, None
+dht11, light_sensor, soil_adc, paj_sensor = None, None, None, None
 pump_relay, led_strip_relay = None, None
 display = None # 初始化OLED显示对象
 
@@ -50,10 +51,10 @@ display = None # 初始化OLED显示对象
 try: dht11 = create_dht11_sensor(machine.Pin('A1', machine.Pin.IN, machine.Pin.PULL_UP), 'DHT11')
 except Exception as e: print(f"❌ DHT11 初始化失败: {e}")
 
-# I2C总线、光照传感器 和 OLED屏幕 初始化
+# I2C总线、光照、OLED 和 手势传感器 初始化
 try:
     # 固件会自动映射I2C(1)到 B6/B7, 无需指定引脚
-    i2c = machine.I2C(1, freq=400000)
+    i2c = machine.I2C(1, freq=200000) # PAJ7620 推荐频率 <= 200kHz
     print("✅ I2C 总线初始化成功")
 
     # 初始化光照传感器
@@ -62,15 +63,21 @@ try:
     # 初始化OLED屏幕
     display = ssd1306.SSD1306_I2C(SCREEN_WIDTH, SCREEN_HEIGHT, i2c, I2C_ADDRESS)
     print("✅ OLED 显示屏初始化成功")
+    
+    # --- 新增: 初始化手势传感器 ---
+    paj_sensor = PAJ7620(i2c)
+    paj_sensor.init()
+    print("✅ PAJ7620 手势传感器初始化成功")
+    
     # 显示启动画面
     display.fill(0)
     display.text('Saffron System', 8, 16)
-    display.text('Starting...', 18, 32)
+    display.text('Gesture Ready!', 8, 32)
     display.show()
     time.sleep(2)
 
 except Exception as e: 
-    print(f"❌ I2C设备(光照/OLED)初始化失败: {e}")
+    print(f"❌ I2C设备(光照/OLED/手势)初始化失败: {e}")
 
 # 其他传感器和执行器初始化
 try: soil_adc = machine.ADC(machine.Pin('A2'))
@@ -101,15 +108,20 @@ def update_display(data):
     lux_str  = f"L:{data.get('lux', '--')}"
     soil_str = f"S:{data.get('soil', '--')}%"
     
+    # --- 新增: 手势信息显示 ---
+    gesture_str = f"Ges: {data.get('gesture', 'None')}"
+    
     # 在屏幕上分两列显示
     display.text(temp_str, 0, 16)
     display.text(humi_str, 64, 16)
     display.text(lux_str, 0, 32)
     display.text(soil_str, 64, 32)
     
-    # 显示循环次数，表明系统仍在运行
-    display.hline(0, 52, 128, 1) # 分割线
-    display.text(f"Cycle: {data.get('cycle', 0)}", 0, 56)
+    # 单独一行显示手势
+    display.text(gesture_str, 0, 44)
+    
+    display.hline(0, 54, 128, 1) # 分割线
+    display.text(f"C:{data.get('cycle', 0)}", 70, 56) # 循环计数
 
     display.show() # 将缓冲区内容推送到屏幕
 
@@ -135,29 +147,53 @@ def process_command(cmd):
         else: print(f'{{"error": "Unknown command: {cmd}"}}')
 
 # --- 主循环 ---
-print("\n🚀 开始主循环 (带OLED显示)...")
+print("\n🚀 开始主循环 (带手势识别)...")
 print("-" * 50)
 cycle_count = 0
-SENSOR_READ_INTERVAL = 1000
+SENSOR_READ_INTERVAL = 1000 # 1秒采集一次环境数据
 last_sensor_read_time = time.ticks_ms()
 poll_obj = select.poll()
 poll_obj.register(sys.stdin, select.POLLIN)
 
+# --- 新增: 手势状态变量 ---
+last_valid_gesture = None
+gesture_display_timer = 0
+GESTURE_TIMEOUT = 3000  # 手势在数据包中保持有效的时间 (3秒)
+
 while True:
-    # 任务1: 检查并处理控制指令
+    # 任务1: (高频) 检查手势
+    if paj_sensor:
+        try:
+            gesture_name = paj_sensor.get_gesture_name(paj_sensor.get_gesture_code())
+            if gesture_name:
+                last_valid_gesture = gesture_name
+                gesture_display_timer = time.ticks_ms()  # 发现新手势，重置计时器
+        except Exception:
+            pass # 忽略手势读取的偶尔错误
+
+    # 任务2: 检查并处理控制指令
     if poll_obj.poll(0):
         command = sys.stdin.readline()
         if command: process_command(command)
 
-    # 任务2: 定时读取传感器数据
+    # 任务3: 定时读取传感器数据并发送
     current_time = time.ticks_ms()
     if time.ticks_diff(current_time, last_sensor_read_time) >= SENSOR_READ_INTERVAL:
         last_sensor_read_time = current_time
         cycle_count += 1
         
+        # --- 新增: 检查手势是否超时 ---
+        current_gesture = None
+        if last_valid_gesture and time.ticks_diff(current_time, gesture_display_timer) < GESTURE_TIMEOUT:
+            current_gesture = last_valid_gesture
+        else:
+            last_valid_gesture = None # 超时后清空
+
         # 采集数据
         data_packet = {"cycle": cycle_count, "timestamp": time.ticks_ms(), 
-                       "temp": None, "humi": None, "lux": None, "soil": None}
+                       "temp": None, "humi": None, "lux": None, "soil": None,
+                       "gesture": current_gesture} # 添加手势字段
+                       
         if dht11 and dht11.measure():
             sensor_data = dht11.get_data()
             if sensor_data.get('is_valid'):
@@ -178,5 +214,7 @@ while True:
         # 通过串口发送JSON数据到树莓派
         print(json.dumps(data_packet))
         
-        # --- 新增: 在OLED上更新显示 ---
+        # 在OLED上更新显示
         update_display(data_packet)
+        
+    time.sleep_ms(20) # 短暂延时，降低CPU占用率

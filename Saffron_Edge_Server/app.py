@@ -1,4 +1,4 @@
-# Saffron_Edge_Server/app.py (优化版 v3 - 增加AI视觉分析)
+# Saffron_Edge_Server/app.py (优化版 v3.1 - 集成手势识别)
 
 import serial
 import json
@@ -12,7 +12,7 @@ import os
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# --- 修改点 1：新增AI视觉处理所需的库 ---
+# --- 视觉处理库保持不变 ---
 import cv2
 import numpy as np
 
@@ -35,7 +35,8 @@ except Exception:
 
 # --- 全局变量 ---
 data_lock = threading.Lock()
-latest_data = { "temperature": None, "humidity": None, "lux": None, "soil": None, "timestamp": None }
+# --- 修改点: 增加 gesture 字段 ---
+latest_data = { "temperature": None, "humidity": None, "lux": None, "soil": None, "gesture": None, "timestamp": None }
 db.create_tables()
 DB_DEVICE_ID = db.ensure_default_device()
 serial_lock = threading.Lock()
@@ -55,7 +56,7 @@ ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'analysis')
 if not os.path.exists(ANALYSIS_DIR):
     os.makedirs(ANALYSIS_DIR)
 
-# (此处省略大量未修改的辅助函数和后台线程，保持与您原文件一致)
+# --- 辅助函数和后台线程 ---
 def _get_bearer_token():
     auth = request.headers.get('Authorization', '')
     if auth.startswith('Bearer '): return auth[len('Bearer '):].strip()
@@ -116,8 +117,11 @@ def serial_reader():
                                 latest_data['humidity'] = data.get('humi')
                                 latest_data['lux'] = data.get('lux')
                                 latest_data['soil'] = data.get('soil')
+                                # --- 修改点: 增加手势数据更新 ---
+                                latest_data['gesture'] = data.get('gesture')
                                 latest_data['timestamp'] = ts
                             try:
+                                # 注意: sensor_data 表没有 gesture 字段, 这里不存入数据库
                                 db.insert_sensor_data(DB_DEVICE_ID, data.get('temp'), data.get('humi'), data.get('lux'), data.get('soil'), ts)
                                 db.update_device_last_seen(DB_DEVICE_ID)
                             except Exception: pass
@@ -181,7 +185,6 @@ def irrigation_worker():
 app = Flask(__name__)
 CORS(app)
 
-# --- 修改点 2：新增AI视觉分析函数 ---
 def analyze_flower_color(image_path):
     """
     使用OpenCV分析图片中的主要花色, 并返回结果。
@@ -247,7 +250,6 @@ def analyze_flower_color(image_path):
 # --- 路由 ---
 @app.route('/')
 def index(): return render_template('index.html')
-# (省略其他页面路由)
 @app.route('/admin')
 def admin_page(): return render_template('admin.html')
 @app.route('/history')
@@ -279,7 +281,6 @@ def capture_photo():
         print(f"❌ 拍照失败: {e}")
         return jsonify({"status": "error", "message": f"拍照失败: {e}"}), 500
 
-# --- 修改点 3：新增AI视觉分析API端点 ---
 @app.route('/api/v1/vision/analyze', methods=['POST'])
 def analyze_vision():
     """拍照并进行AI视觉分析"""
@@ -303,7 +304,6 @@ def analyze_vision():
         print(f"❌ AI视觉分析流程出错: {e}")
         return jsonify({"status": "error", "message": f"AI分析流程出错: {e}"}), 500
 
-# (此处省略其他未修改的API路由)
 @app.route('/api/v1/control', methods=['POST'])
 def control_device():
     if REQUIRE_ADMIN_FOR_CONTROL:
@@ -484,4 +484,3 @@ if __name__ == '__main__':
 
     print("启动统一服务器... 请在浏览器中访问 http://<你的树莓派IP>:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)
-

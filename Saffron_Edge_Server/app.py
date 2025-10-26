@@ -1,4 +1,4 @@
-# Saffron_Edge_Server/app.py (优化版 v2)
+# Saffron_Edge_Server/app.py (优化版 v3 - 增加AI视觉分析)
 
 import serial
 import json
@@ -6,25 +6,26 @@ import threading
 import time
 import io, csv
 from datetime import datetime
-from flask import Flask, jsonify, render_template, request, Response
+from flask import Flask, jsonify, render_template, request, Response, url_for
 from flask_cors import CORS
 import os
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# --- 修改点 1：将摄像头相关代码移到全局 ---
+# --- 修改点 1：新增AI视觉处理所需的库 ---
+import cv2
+import numpy as np
+
+# --- 摄像头相关代码 ---
 PI_CAMERA_AVAILABLE = False
 picam2 = None # 全局摄像头对象
 try:
     from picamera2 import Picamera2
-    # 仅创建实例，不在这里启动
     picam2 = Picamera2()
     PI_CAMERA_AVAILABLE = True
     print("✅ picamera2 库加载成功，摄像头对象已创建。")
 except Exception as e:
-    print(f"⚠️ 警告: picamera2 初始化失败: {e}。拍照功能将不可用。")
-# --- 结束修改 ---
-
+    print(f"⚠️ 警告: picamera2 初始化失败: {e}。拍照/视觉功能将不可用。")
 
 # 数据库集成
 try:
@@ -32,7 +33,7 @@ try:
 except Exception:
     import db
 
-# --- 全局变量 (未改变) ---
+# --- 全局变量 ---
 data_lock = threading.Lock()
 latest_data = { "temperature": None, "humidity": None, "lux": None, "soil": None, "timestamp": None }
 db.create_tables()
@@ -46,12 +47,15 @@ ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'saffron-admin')
 ser = None
 auto_irrigation_state = { "watering": False, "last_start_ts": None, "last_end_ts": None }
 
-# 摄像头照片保存目录
+# 摄像头照片及分析结果保存目录
 CAPTURES_DIR = os.path.join(os.path.dirname(__file__), 'static', 'captures')
 if not os.path.exists(CAPTURES_DIR):
     os.makedirs(CAPTURES_DIR)
+ANALYSIS_DIR = os.path.join(os.path.dirname(__file__), 'static', 'analysis')
+if not os.path.exists(ANALYSIS_DIR):
+    os.makedirs(ANALYSIS_DIR)
 
-# --- 原有的函数 (此处省略未修改的代码以保持简洁) ---
+# (此处省略大量未修改的辅助函数和后台线程，保持与您原文件一致)
 def _get_bearer_token():
     auth = request.headers.get('Authorization', '')
     if auth.startswith('Bearer '): return auth[len('Bearer '):].strip()
@@ -172,15 +176,78 @@ def irrigation_worker():
                     auto_irrigation_state["watering"] = False
             time.sleep(POLL_INTERVAL)
         except Exception: time.sleep(POLL_INTERVAL)
-# --- 结束省略 ---
+
 
 app = Flask(__name__)
 CORS(app)
 
-# --- 路由 (此处省略大部分未修改的路由) ---
+# --- 修改点 2：新增AI视觉分析函数 ---
+def analyze_flower_color(image_path):
+    """
+    使用OpenCV分析图片中的主要花色, 并返回结果。
+    """
+    try:
+        image = cv2.imread(image_path)
+        # 转换到HSV颜色空间
+        hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        # 定义颜色范围 (H, S, V)
+        # 这些值可能需要根据您的实际光照和摄像头进行微调
+        color_ranges = {
+            'red': ([0, 120, 70], [10, 255, 255]),      # 红色范围 (较低的H值)
+            'green': ([35, 80, 40], [85, 255, 255]),    # 绿色范围
+            'pink': ([140, 100, 100], [170, 255, 255]) # 粉色范围 (较高的H值)
+        }
+
+        scores = {}
+        for color, (lower, upper) in color_ranges.items():
+            lower_bound = np.array(lower)
+            upper_bound = np.array(upper)
+            # 创建颜色掩码
+            mask = cv2.inRange(hsv_image, lower_bound, upper_bound)
+            # 计算颜色面积
+            scores[color] = cv2.countNonZero(mask)
+
+        # 找到得分最高的颜色
+        if not any(scores.values()):
+            detected_color = 'none'
+        else:
+            detected_color = max(scores, key=scores.get)
+        
+        # 映射到生长状态
+        growth_stage_map = {
+            'green': '花蕾期 (Budding Stage)',
+            'pink': '盛开期 (Flowering Stage)',
+            'red': '成熟/凋谢期 (Mature/Withered Stage)',
+            'none': '未识别到有效目标'
+        }
+        growth_stage = growth_stage_map.get(detected_color, '未知')
+
+        # 在图片上绘制结果用于展示
+        cv2.putText(image, f"Color: {detected_color}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(image, f"Stage: {growth_stage}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+        # 保存分析后的图片
+        analysis_filename = 'analyzed_' + os.path.basename(image_path)
+        analysis_filepath = os.path.join(ANALYSIS_DIR, analysis_filename)
+        cv2.imwrite(analysis_filepath, image)
+        
+        return {
+            "status": "success",
+            "detected_color": detected_color,
+            "growth_stage": growth_stage,
+            "scores": scores,
+            "analysis_image_url": url_for('static', filename=f'analysis/{analysis_filename}', _external=False)
+        }
+
+    except Exception as e:
+        print(f"❌ 视觉分析失败: {e}")
+        return {"status": "error", "message": str(e)}
+
+# --- 路由 ---
 @app.route('/')
 def index(): return render_template('index.html')
-# ... 其他页面路由 ...
+# (省略其他页面路由)
 @app.route('/admin')
 def admin_page(): return render_template('admin.html')
 @app.route('/history')
@@ -188,40 +255,57 @@ def history_page(): return render_template('history.html')
 @app.route('/login')
 def login_page(): return render_template('login.html')
 
-# --- 修改点 2：简化拍照API端点 ---
+
+# --- API 路由 ---
+
 @app.route('/api/v1/camera/capture', methods=['POST'])
 def capture_photo():
     """处理拍照请求，使用全局摄像头对象。"""
     if not PI_CAMERA_AVAILABLE or not picam2:
         return jsonify({"status": "error", "message": "摄像头模块不可用或未初始化。"}), 503
-
     try:
-        # 1. 定义文件名和路径
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"saffron_{timestamp}.jpg"
         filepath = os.path.join(CAPTURES_DIR, filename)
-        
-        # 2. 直接拍照并保存 (不再需要 start/stop)
         picam2.capture_file(filepath)
         print(f"照片已保存至: {filepath}")
-        
-        # 3. 返回成功响应
         relative_path = os.path.join('static', 'captures', filename)
         return jsonify({
             "status": "success", 
             "message": f"照片拍摄成功！",
             "path": relative_path
         })
-            
     except Exception as e:
         print(f"❌ 拍照失败: {e}")
         return jsonify({"status": "error", "message": f"拍照失败: {e}"}), 500
-# --- 结束修改 ---
 
-# --- 其他未修改的 API 路由 (省略) ---
+# --- 修改点 3：新增AI视觉分析API端点 ---
+@app.route('/api/v1/vision/analyze', methods=['POST'])
+def analyze_vision():
+    """拍照并进行AI视觉分析"""
+    if not PI_CAMERA_AVAILABLE or not picam2:
+        return jsonify({"status": "error", "message": "摄像头模块不可用或未初始化。"}), 503
+
+    try:
+        # 1. 拍照
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"capture_for_analysis_{timestamp}.jpg"
+        filepath = os.path.join(CAPTURES_DIR, filename)
+        picam2.capture_file(filepath)
+        print(f"为AI分析拍摄照片: {filepath}")
+
+        # 2. 调用分析函数
+        analysis_result = analyze_flower_color(filepath)
+
+        return jsonify(analysis_result)
+
+    except Exception as e:
+        print(f"❌ AI视觉分析流程出错: {e}")
+        return jsonify({"status": "error", "message": f"AI分析流程出错: {e}"}), 500
+
+# (此处省略其他未修改的API路由)
 @app.route('/api/v1/control', methods=['POST'])
 def control_device():
-    # ... 省略 ...
     if REQUIRE_ADMIN_FOR_CONTROL:
         provided = request.headers.get('X-Admin-Token')
         user = get_current_user()
@@ -250,7 +334,6 @@ def control_device():
     except Exception: pass
     if success: return jsonify({"status": "success", "message": f"Command '{command}' sent."})
     else: return jsonify({"status": "error", "message": "Device not connected or busy."}), 503
-# ... 省略其他API路由 ...
 @app.route('/api/v1/auth/register', methods=['POST'])
 def register():
     payload = request.get_json(silent=True) or {}
@@ -383,20 +466,16 @@ def device_status():
 
 
 if __name__ == '__main__':
-    # --- 修改点 3：在主程序启动时，真正启动摄像头 ---
     if PI_CAMERA_AVAILABLE and picam2:
         try:
-            # 这里的 still_config 只是一个例子，你可以根据需要配置
-            # 对于简单拍照，默认配置通常就足够了
             still_config = picam2.create_still_configuration()
             picam2.configure(still_config)
             picam2.start()
             print("✅ 摄像头已成功启动并准备就绪。")
         except Exception as e:
             print(f"❌ 启动摄像头失败: {e}")
-            PI_CAMERA_AVAILABLE = False # 如果启动失败，就标记为不可用
-    # --- 结束修改 ---
-
+            PI_CAMERA_AVAILABLE = False
+    
     reader_thread = threading.Thread(target=serial_reader, daemon=True)
     reader_thread.start()
 
@@ -405,3 +484,4 @@ if __name__ == '__main__':
 
     print("启动统一服务器... 请在浏览器中访问 http://<你的树莓派IP>:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)
+

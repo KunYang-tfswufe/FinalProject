@@ -1,6 +1,7 @@
-# 藏红花培育系统主程序 - v9.3 (执行器与UI布局修正版)
-# - 修复手势控制执行器不响应的Bug (pin.toggle -> pin.value)
-# - 优化主监控页UI，解决"Ges横条"问题
+# 藏红花培育系统主程序 - v9.4 (全新手势选择器控制)
+# - 移除"挥手"手势, 使用更可靠的手势组合
+# - 在控制页引入">"选择器，可控制水泵、灯带、状态灯
+# - 向前/向后: 移动选择器 | 向上/向下: 开关选中设备
 
 import machine
 import time
@@ -34,16 +35,17 @@ try:
 except ImportError as e:
     print(f"❌ 关键驱动模块导入失败: {e}"); sys.exit()
 
-print("\n=== 藏红花培育系统 v9.3 - Bug修复版 ===")
+print("\n=== 藏红花培育系统 v9.4 - 全新交互版 ===")
 
-# --- 硬件与OLED配置 ---
+# --- 全局状态管理 ---
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 64
 I2C_ADDRESS = 0x3C
-
-# --- OLED页面状态管理 ---
 current_display_page = 0
 NUM_PAGES = 3
+# 新增：控制页面的选择器状态 (0:水泵, 1:灯带, 2:状态灯)
+control_page_selection = 0
+NUM_CONTROL_ITEMS = 3 
 
 # --- 硬件初始化 ---
 status_led = machine.Pin('C13', machine.Pin.OUT, value=1)
@@ -82,13 +84,13 @@ try:
     print("✅ LED灯带继电器(B12)初始化成功")
 except Exception as e: print(f"❌ LED灯带继电器初始化失败: {e}")
 
-# --- OLED 显示屏更新函数 (UI布局优化) ---
+# --- OLED 显示屏更新函数 (全新控制页) ---
 def update_display(data, page_num):
     if not display: return
     display.fill(0)
     page_indicator = f"[{page_num + 1}/{NUM_PAGES}]"
 
-    # --- 页面 1: 主监控页 (优化布局) ---
+    # --- 页面 1: 主监控页 ---
     if page_num == 0:
         display.text("Saffron Monitor", 4, 0)
         display.text("----------------", 0, 9)
@@ -100,20 +102,30 @@ def update_display(data, page_num):
         display.text(humi_str, 64, 19)
         display.text(lux_str, 0, 35)
         display.text(soil_str, 64, 35)
-        
-        # 将手势信息移到最底行左侧
         gesture_text = f"G:{data.get('gesture', '--')}"
         display.text(gesture_text, 0, 55)
 
-    # --- 页面 2: 设备控制页 ---
+    # --- 页面 2: 设备控制页 (带选择器) ---
     elif page_num == 1:
         display.text("Device Control", 4, 0)
         display.text("----------------", 0, 9)
+        
+        # 获取各设备状态
         pump_state = "ON" if pump_relay and pump_relay.value() else "OFF"
-        led_state = "ON" if led_strip_relay and led_strip_relay.value() else "OFF"
-        display.text(f"Water Pump : {pump_state}", 0, 20)
-        display.text(f"LED Strip  : {led_state}", 0, 34)
-        display.text("Up/Down:Pump|Wave:LED", 0, 51)
+        led_strip_state = "ON" if led_strip_relay and led_strip_relay.value() else "OFF"
+        # 状态灯是低电平点亮，逻辑相反
+        status_led_state = "ON" if status_led and not status_led.value() else "OFF"
+        
+        # 根据选择器状态加前缀 ">"
+        pump_line = f"{'>' if control_page_selection == 0 else ' '} Water Pump : {pump_state}"
+        led_strip_line = f"{'>' if control_page_selection == 1 else ' '} LED Strip  : {led_strip_state}"
+        status_led_line = f"{'>' if control_page_selection == 2 else ' '} Status LED : {status_led_state}"
+        
+        display.text(pump_line, 0, 18)
+        display.text(led_strip_line, 0, 31)
+        display.text(status_led_line, 0, 44)
+        
+        display.text("Fwd/Bwd:Sel|Up/Dn:Tgl", 0, 55)
 
     # --- 页面 3: 系统信息页 ---
     elif page_num == 2:
@@ -125,7 +137,6 @@ def update_display(data, page_num):
         py_ver = f"{sys.version_info[0]}.{sys.version_info[1]}"
         display.text(f"MicroPython: v{py_ver}", 0, 48)
 
-    # 在右下角显示页码指示器
     display.text(page_indicator, 128 - len(page_indicator) * 8 - 2, 55)
     display.show()
 
@@ -145,30 +156,22 @@ def process_command(cmd):
         if response: print(response)
         else: print('{"error": "Unknown or unavailable actuator"}')
     except (ValueError, KeyError):
-        if cmd == "led_on": status_led.low(); print('{"response": "LED is ON"}')
-        elif cmd == "led_off": status_led.high(); print('{"response": "LED is OFF"}')
+        if cmd == "led_on": status_led.low(); print('{"response": "Status LED is ON"}')
+        elif cmd == "led_off": status_led.high(); print('{"response": "Status LED is OFF"}')
         else: print(f'{{"error": "Unknown command: {cmd}"}}')
 
 # --- 主循环 ---
-print("\n🚀 开始主循环 (Bug修复版)...")
+print("\n🚀 开始主循环 (全新手势交互)...")
 print("-" * 50)
-cycle_count = 0
-SENSOR_READ_INTERVAL = 1000 # 1秒
-last_sensor_read_time = time.ticks_ms()
-poll_obj = select.poll()
-poll_obj.register(sys.stdin, select.POLLIN)
-
-last_valid_gesture = None
-gesture_display_timer = 0
-GESTURE_TIMEOUT = 3000
-last_gesture_process_time = 0
-GESTURE_COOLDOWN = 500
+cycle_count = 0; last_sensor_read_time = time.ticks_ms();
+poll_obj = select.poll(); poll_obj.register(sys.stdin, select.POLLIN)
+last_valid_gesture = None; gesture_display_timer = 0; GESTURE_TIMEOUT = 3000
+last_gesture_process_time = 0; GESTURE_COOLDOWN = 500
 current_data_packet = {"cycle": 0, "gesture": None}
 
 while True:
     current_time = time.ticks_ms()
-
-    # 任务1: (高频) 检查并处理手势
+    
     if paj_sensor and time.ticks_diff(current_time, last_gesture_process_time) > GESTURE_COOLDOWN:
         try:
             gesture_name = paj_sensor.get_gesture_name(paj_sensor.get_gesture_code())
@@ -185,63 +188,51 @@ while True:
                     current_display_page = (current_display_page - 1 + NUM_PAGES) % NUM_PAGES
                     needs_display_update = True
                 
-                # 在“设备控制页”时，响应控制手势
+                # --- 全新的控制页手势逻辑 ---
                 elif current_display_page == 1:
-                    # --- CRITICAL FIX: 使用正确的 pin.value() 进行状态翻转 ---
-                    if gesture_name in ("向上", "向下") and pump_relay:
-                        pump_relay.value(not pump_relay.value())
+                    if gesture_name == "向前":
+                        control_page_selection = (control_page_selection + 1) % NUM_CONTROL_ITEMS
                         needs_display_update = True
-                        print(f'{{"event":"gesture_control", "actuator":"pump", "new_state":{pump_relay.value()}}}')
-                    elif gesture_name == "挥手" and led_strip_relay:
-                        led_strip_relay.value(not led_strip_relay.value())
+                    elif gesture_name == "向后":
+                        control_page_selection = (control_page_selection - 1 + NUM_CONTROL_ITEMS) % NUM_CONTROL_ITEMS
                         needs_display_update = True
-                        print(f'{{"event":"gesture_control", "actuator":"led_strip", "new_state":{led_strip_relay.value()}}}')
+                    elif gesture_name in ("向上", "向下"):
+                        if control_page_selection == 0 and pump_relay:
+                            pump_relay.value(not pump_relay.value())
+                        elif control_page_selection == 1 and led_strip_relay:
+                            led_strip_relay.value(not led_strip_relay.value())
+                        elif control_page_selection == 2 and status_led:
+                            status_led.value(not status_led.value())
+                        needs_display_update = True
 
                 if needs_display_update:
                     update_display(current_data_packet, current_display_page)
-        except Exception:
-            pass
+        except Exception: pass
 
-    # 任务2: 检查并处理来自树莓派的控制指令
     if poll_obj.poll(0):
         command = sys.stdin.readline()
         if command: 
             process_command(command)
-            if current_display_page == 1:
-                 update_display(current_data_packet, current_display_page)
+            if current_display_page == 1: update_display(current_data_packet, current_display_page)
 
-    # 任务3: 定时读取传感器数据并发送/刷新
-    if time.ticks_diff(current_time, last_sensor_read_time) >= SENSOR_READ_INTERVAL:
-        last_sensor_read_time = current_time
-        cycle_count += 1
+    if time.ticks_diff(current_time, last_sensor_read_time) >= 1000:
+        last_sensor_read_time = current_time; cycle_count += 1
         
-        current_gesture_for_pi = None
-        if last_valid_gesture and time.ticks_diff(current_time, gesture_display_timer) < GESTURE_TIMEOUT:
-            current_gesture_for_pi = last_valid_gesture
-        else:
-            last_valid_gesture = None
-            
-        current_data_packet = {
-            "cycle": cycle_count, "timestamp": time.ticks_ms(), 
-            "temp": None, "humi": None, "lux": None, "soil": None,
-            "gesture": current_gesture_for_pi
-        } 
+        current_gesture_for_pi = last_valid_gesture if (last_valid_gesture and time.ticks_diff(current_time, gesture_display_timer) < GESTURE_TIMEOUT) else None
+        if not current_gesture_for_pi: last_valid_gesture = None
+        
+        current_data_packet = {"cycle": cycle_count, "timestamp": time.ticks_ms(), "gesture": current_gesture_for_pi} 
                        
         if dht11 and dht11.measure():
             sensor_data = dht11.get_data()
             if sensor_data.get('is_valid'):
                 current_data_packet['temp'] = sensor_data.get('temperature')
                 current_data_packet['humi'] = sensor_data.get('humidity')
-        if light_sensor:
-            lux_val = light_sensor.read_lux()
-            if lux_val is not None: current_data_packet['lux'] = round(lux_val, 1)
+        if light_sensor: current_data_packet['lux'] = round(light_sensor.read_lux(), 1) if light_sensor.read_lux() is not None else None
         if soil_adc:
             try:
-                raw_value = soil_adc.read_u16()
-                DRY, WET = 59000, 26000
-                if WET <= raw_value <= DRY + 2000:
-                    p = 100 * (DRY - raw_value) / (DRY - WET)
-                    current_data_packet['soil'] = round(max(0, min(100, p)))
+                raw, DRY, WET = soil_adc.read_u16(), 59000, 26000
+                if WET <= raw <= DRY + 2000: current_data_packet['soil'] = round(max(0, min(100, 100 * (DRY - raw) / (DRY - WET))))
             except: pass
                 
         print(json.dumps(current_data_packet))

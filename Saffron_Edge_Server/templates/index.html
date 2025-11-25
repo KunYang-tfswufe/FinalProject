@@ -40,6 +40,8 @@
             <button id="led-off-btn" class="control-btn btn-off">关闭指示灯</button>
             <button id="pump-on-btn" class="control-btn btn-on">开启水泵</button>
             <button id="pump-off-btn" class="control-btn btn-off">关闭水泵</button>
+            <button id="led-strip-on-btn" class="control-btn btn-on">点亮灯带</button>
+            <button id="led-strip-off-btn" class="control-btn btn-off">熄灭灯带</button>
             <div id="control-status"></div>
         </div>
             <div class="controls">
@@ -164,10 +166,11 @@
 
 
         document.getElementById('led-on-btn').addEventListener('click', () => sendControlCommand('led_on'));
+        document.getElementById('led-off-btn').addEventListener('click', () => sendControlCommand('led_off'));
         document.getElementById('pump-on-btn').addEventListener('click', () => sendControlCommand(JSON.stringify({actuator:'pump', action:'on'})));
         document.getElementById('pump-off-btn').addEventListener('click', () => sendControlCommand(JSON.stringify({actuator:'pump', action:'off'})));
-
-        document.getElementById('led-off-btn').addEventListener('click', () => sendControlCommand('led_off'));
+        document.getElementById('led-strip-on-btn').addEventListener('click', () => sendControlCommand(JSON.stringify({actuator:'led_strip', action:'on'})));
+        document.getElementById('led-strip-off-btn').addEventListener('click', () => sendControlCommand(JSON.stringify({actuator:'led_strip', action:'off'})));
 
         fetchData();
         // 修改这里，将刷新频率提高到每秒1次

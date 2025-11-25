@@ -41,6 +41,7 @@ dht11 = None
 light_sensor = None
 soil_adc = None
 pump_relay = None # 初始化水泵变量
+led_strip_relay = None # 初始化LED灯带变量
 
 try: dht11 = create_dht11_sensor(machine.Pin('A1', machine.Pin.IN, machine.Pin.PULL_UP), 'DHT11')
 except Exception as e: print(f"❌ DHT11 初始化失败: {e}")
@@ -63,6 +64,14 @@ except Exception as e:
     print(f"❌ 水泵继电器初始化失败: {e}")
     # 即使失败，程序也继续运行，只是水泵功能不可用
 
+# --- 新增：初始化LED灯带继电器引脚 (B12) ---
+try:
+    # 同样假设为高电平触发，初始值 value=0 (关闭)
+    led_strip_relay = machine.Pin('B12', machine.Pin.OUT, value=0)
+    print("✅ LED灯带继电器引脚 (B12) 初始化成功 (高电平触发模式)")
+except Exception as e:
+    print(f"❌ LED灯带继电器初始化失败: {e}")
+
 # --- 命令处理器 (修正为高电平触发逻辑) ---
 def process_command(cmd):
     cmd = cmd.strip()
@@ -82,6 +91,16 @@ def process_command(cmd):
                 print('{"response": "Pump is OFF"}')
             else:
                 print('{"error": "Unknown pump action"}')
+        # --- 新增：处理LED灯带命令 ---
+        elif actuator == 'led_strip' and led_strip_relay:
+            if action == 'on':
+                led_strip_relay.high() # 高电平，点亮灯带
+                print('{"response": "LED Strip is ON"}')
+            elif action == 'off':
+                led_strip_relay.low() # 低电平，熄灭灯带
+                print('{"response": "LED Strip is OFF"}')
+            else:
+                print('{"error": "Unknown led_strip action"}')
         else:
             print('{"error": "Unknown or unavailable actuator"}')
         return # JSON命令处理完毕，直接返回
